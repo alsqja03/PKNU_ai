@@ -27,7 +27,7 @@ if st.button("답변 생성"):
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
-                        {"role": "system", "content": "당신은 유용하고 친절한 AI 어시스턴트입니다."},
+                        {"role": "system", "content": "당신은 사실만을 답하는 정확한 AI입니다. 꾸며내거나 지어내어서 답변을 하지 말고, 모르거나 애매한 내용이라면 '잘 모르겠습니다.'라고 명시하고, 지어낸 내용이면 '지어낸 내용입니다.'라고 명시하세요."},
                         {"role": "user", "content": user_input}
                     ],
                     temperature=0.7,
