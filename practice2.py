@@ -34,7 +34,7 @@ def get_client():
 def get_response(api_key: str, messages: list) -> str:
     openai.api_key = api_key
     response = openai.ChatCompletion.create(
-        model="gpt-4.1-mini",  # GPT-4.1 Mini 모델 사용
+        model="gpt-4o-mini",  # GPT-4.1 Mini 모델 사용
         messages=messages,
         max_tokens=150,
         temperature=0.7,
