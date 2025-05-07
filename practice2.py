@@ -206,7 +206,7 @@ elif page == "ChatPDF":
             except Exception as e:
                 st.error(f"어시스턴트 생성 중 오류 발생: {e}")
 
-    if st.session_state.pdf_file_id:
+    if st.session_state.pdf_file_id and st.session_state.assistant_id:
         st.session_state.pdf_input = st.text_area("PDF에 대해 질문해보세요:", value=st.session_state.pdf_input, height=100)
         if st.button("질문하기"):
             if st.session_state.pdf_input.strip() == "":
