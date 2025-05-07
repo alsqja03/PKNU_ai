@@ -15,7 +15,7 @@ if "pdf_file_id" not in st.session_state:
 if "assistant_id" not in st.session_state:
     st.session_state.assistant_id = None
 
-page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "ChatBot", "ChatPDF"])
+page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "Chatbot", "ChatPDF"])
 
 st.session_state.api_key = st.sidebar.text_input(
     "OpenAI API Key 입력",
@@ -40,6 +40,19 @@ def upload_pdf(file):
     client = get_client()
     uploaded = client.files.create(file=(file.name, file), purpose="assistants")
     return uploaded.id
+
+def chat_with_pdf(assistant_id, file_id, user_message):
+    client = get_client()
+    # PDF 파일과 연결된 assistant_id가 필요함
+    # 실제 PDF 내용을 기반으로 질문을 처리하는 방식으로 구성할 수 있음
+    # 예시로 간단한 질문 답변을 생성하는 방식으로 수정할 수 있음
+    response = client.completions.create(
+        model="gpt-4o-mini",  # GPT-4.1 Mini 모델 사용
+        prompt=f"다음 PDF 파일에 대해 사용자 질문: {user_message}\n[PDF 내용 기반 응답]",
+        max_tokens=200,
+        temperature=0.7
+    )
+    return response.choices[0].text.strip()
 
 def reset_session_state(clear_api_key=False):
     st.session_state.chat_history = []
