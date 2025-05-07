@@ -32,9 +32,9 @@ def get_client():
 
 @st.cache_data
 def get_response(api_key: str, messages: list) -> str:
-    client = openai.OpenAI(api_key=api_key)
+    client = get_client()
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",  # GPT-4.1 Mini 모델로 변경
         messages=messages,
         temperature=0.7,
     )
@@ -47,10 +47,10 @@ def upload_pdf(file):
 
 def create_assistant(file_id):
     client = get_client()
-    assistant = client.beta.assistants.create(
+    assistant = client.assistants.create(
         name="PDF Chat Assistant",
         instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
-        model="gpt-4o",
+        model="gpt-4o-mini",  # GPT-4.1 Mini 모델로 변경
         tools=[{"type": "file_search"}],
         file_ids=[file_id],
     )
@@ -59,35 +59,36 @@ def create_assistant(file_id):
 def chat_with_pdf(assistant_id, file_id, user_message):
     client = get_client()
     if not st.session_state.thread_id:
-        thread = client.beta.threads.create()
+        thread = client.threads.create()
         st.session_state.thread_id = thread.id
-    client.beta.threads.messages.create(
+    client.threads.messages.create(
         thread_id=st.session_state.thread_id,
         role="user",
         content=user_message,
     )
-    run = client.beta.threads.runs.create(
+    run = client.threads.runs.create(
         thread_id=st.session_state.thread_id,
         assistant_id=assistant_id,
     )
     with st.spinner("응답 생성 중..."):
         while True:
-            run_status = client.beta.threads.runs.retrieve(
+            run_status = client.threads.runs.retrieve(
                 thread_id=st.session_state.thread_id,
                 run_id=run.id,
             )
             if run_status.status == "completed":
                 break
-        messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
+        messages = client.threads.messages.list(thread_id=st.session_state.thread_id)
         return messages.data[0].content[0].text.value
 
-def reset_chat_history():
+def reset_session_state(clear_api_key=False):
+    st.session_state.clear_flag = False
     st.session_state.chat_history = []
     st.session_state.library_chat_history = []
     st.session_state.thread_id = None
-
-def reset_api_key():
-    st.session_state.api_key = ""
+    st.session_state.pdf_file_id = None
+    if clear_api_key:
+        st.session_state.api_key = ""
 
 # 페이지별 로직
 if page == "Q&A":
@@ -96,7 +97,7 @@ if page == "Q&A":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_chat_history()
+            reset_session_state()
 
     question = st.text_area("질문을 입력하세요:", height=100)
     if st.button("질문하기"):
@@ -120,7 +121,7 @@ elif page == "Chat":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_chat_history()
+            reset_session_state()
 
     user_input = st.text_area("메시지를 입력하세요:", height=100)
     if st.button("질문하기"):
@@ -143,7 +144,7 @@ elif page == "Chatbot":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_chat_history()
+            reset_session_state()
 
     user_input = st.text_area("도서관에 대해 궁금한 점을 입력하세요:", height=100)
     library_regulations = """
@@ -181,7 +182,7 @@ elif page == "ChatPDF":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_chat_history()
+            reset_session_state()
 
     if uploaded_file and st.session_state.api_key:
         if not st.session_state.pdf_file_id:
@@ -190,7 +191,7 @@ elif page == "ChatPDF":
             assistant_id = create_assistant(file_id)
             st.session_state.assistant_id = assistant_id
             st.success("PDF 업로드 및 어시스턴트 준비 완료!")
-    if st.session_state.pdf_file_id:
+        
         user_question = st.text_area("PDF에 대해 질문해보세요:", height=100)
         if st.button("질문하기"):
             if user_question.strip() == "":
