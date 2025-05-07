@@ -47,14 +47,18 @@ def upload_pdf(file):
 
 def create_assistant(file_id):
     client = get_client()
-    assistant = client.assistants.create(
-        name="PDF Chat Assistant",
-        instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
-        model="gpt-4o-mini",  # GPT-4.1 Mini 모델로 변경
-        tools=[{"type": "file_search"}],
-        file_ids=[file_id],
-    )
-    return assistant.id
+    try:
+        assistant = client.assistants.create(
+            name="PDF Chat Assistant",
+            instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
+            model="gpt-4o-mini",  # GPT-4.1 Mini 모델로 변경
+            tools=[{"type": "file_search"}],
+            file_ids=[file_id],
+        )
+        return assistant.id
+    except Exception as e:
+        st.error(f"어시스턴트 생성 중 오류 발생: {e}")
+        return None
 
 def chat_with_pdf(assistant_id, file_id, user_message):
     client = get_client()
@@ -192,6 +196,7 @@ elif page == "ChatPDF":
             st.session_state.assistant_id = assistant_id
             st.success("PDF 업로드 및 어시스턴트 준비 완료!")
         
+        # PDF 업로드 후 사용자가 질문할 수 있도록 텍스트 입력창 추가
         user_question = st.text_area("PDF에 대해 질문해보세요:", height=100)
         if st.button("질문하기"):
             if user_question.strip() == "":
