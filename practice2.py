@@ -3,6 +3,7 @@ import openai
 
 st.set_page_config(page_title="GPT-4.1 Mini Web App", layout="centered")
 
+# 세션 상태 초기화
 if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 if "chat_history" not in st.session_state:
@@ -80,13 +81,12 @@ def chat_with_pdf(assistant_id, file_id, user_message):
         messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
         return messages.data[0].content[0].text.value
 
-def reset_session_state():
-    st.session_state.clear_flag = False
+def reset_chat_history():
     st.session_state.chat_history = []
     st.session_state.library_chat_history = []
-    st.session_state.pdf_file_id = None
-    st.session_state.assistant_id = None
     st.session_state.thread_id = None
+
+def reset_api_key():
     st.session_state.api_key = ""
 
 # 페이지별 로직
@@ -96,8 +96,8 @@ if page == "Q&A":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state()
-    
+            reset_chat_history()
+
     question = st.text_area("질문을 입력하세요:", height=100)
     if st.button("질문하기"):
         if question.strip() == "":
@@ -120,8 +120,8 @@ elif page == "Chat":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state()
-    
+            reset_chat_history()
+
     user_input = st.text_area("메시지를 입력하세요:", height=100)
     if st.button("질문하기"):
         if user_input.strip() == "":
@@ -143,8 +143,8 @@ elif page == "Chatbot":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state()
-    
+            reset_chat_history()
+
     user_input = st.text_area("도서관에 대해 궁금한 점을 입력하세요:", height=100)
     library_regulations = """
     제20조(휴관일)
@@ -181,8 +181,8 @@ elif page == "ChatPDF":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state()
-    
+            reset_chat_history()
+
     if uploaded_file and st.session_state.api_key:
         if not st.session_state.pdf_file_id:
             file_id = upload_pdf(uploaded_file)
