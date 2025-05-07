@@ -14,10 +14,6 @@ if "pdf_file_id" not in st.session_state:
     st.session_state.pdf_file_id = None
 if "assistant_id" not in st.session_state:
     st.session_state.assistant_id = None
-if "thread_id" not in st.session_state:
-    st.session_state.thread_id = None
-if "clear_flag" not in st.session_state:
-    st.session_state.clear_flag = False
 
 page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "Chatbot", "ChatPDF"])
 
@@ -62,35 +58,19 @@ def create_assistant(file_id):
 
 def chat_with_pdf(assistant_id, file_id, user_message):
     client = get_client()
-    if not st.session_state.thread_id:
-        thread = client.threads.create()
-        st.session_state.thread_id = thread.id
-    client.threads.messages.create(
-        thread_id=st.session_state.thread_id,
-        role="user",
-        content=user_message,
-    )
-    run = client.threads.runs.create(
-        thread_id=st.session_state.thread_id,
-        assistant_id=assistant_id,
-    )
-    with st.spinner("응답 생성 중..."):
-        while True:
-            run_status = client.threads.runs.retrieve(
-                thread_id=st.session_state.thread_id,
-                run_id=run.id,
-            )
-            if run_status.status == "completed":
-                break
-        messages = client.threads.messages.list(thread_id=st.session_state.thread_id)
-        return messages.data[0].content[0].text.value
+    # Simple chat flow without thread management
+    messages = [
+        {"role": "system", "content": "당신은 친절한 AI 어시스턴트입니다."},
+        {"role": "user", "content": user_message}
+    ]
+    response = get_response(st.session_state.api_key, messages)
+    return response
 
 def reset_session_state(clear_api_key=False):
-    st.session_state.clear_flag = False
     st.session_state.chat_history = []
     st.session_state.library_chat_history = []
-    st.session_state.thread_id = None
     st.session_state.pdf_file_id = None
+    st.session_state.assistant_id = None
     if clear_api_key:
         st.session_state.api_key = ""
 
@@ -195,22 +175,3 @@ elif page == "ChatPDF":
             assistant_id = create_assistant(file_id)
             st.session_state.assistant_id = assistant_id
             st.success("PDF 업로드 및 어시스턴트 준비 완료!")
-        
-        # PDF 업로드 후 사용자가 질문할 수 있도록 텍스트 입력창 추가
-        user_question = st.text_area("PDF에 대해 질문해보세요:", height=100)
-        if st.button("질문하기"):
-            if user_question.strip() == "":
-                st.warning("질문을 입력해주세요.")
-            else:
-                try:
-                    answer = chat_with_pdf(
-                        st.session_state.assistant_id,
-                        st.session_state.pdf_file_id,
-                        user_question
-                    )
-                    st.subheader("응답:")
-                    st.write(answer)
-                except Exception as e:
-                    st.error(f"오류 발생: {e}")
-    elif uploaded_file and not st.session_state.api_key:
-        st.warning("API Key를 입력해 주세요.")
