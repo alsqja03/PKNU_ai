@@ -24,35 +24,34 @@ st.session_state.api_key = st.sidebar.text_input(
 )
 
 def get_client():
-    return openai.OpenAI(api_key=st.session_state.api_key)
+    return openai
 
 @st.cache_data
 def get_response(api_key: str, messages: list) -> str:
-    client = get_client()
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",  # GPT-4.1 Mini 모델로 변경
+    openai.api_key = api_key
+    response = openai.ChatCompletion.create(
+        model="gpt-4.1-mini",  # GPT-4.1 Mini 모델 사용
         messages=messages,
         temperature=0.7,
     )
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message["content"].strip()
 
 def upload_pdf(file):
-    client = get_client()
-    uploaded = client.files.create(file=(file.name, file), purpose="assistants")
+    openai.api_key = st.session_state.api_key
+    uploaded = openai.File.create(file=(file.name, file), purpose="answers")
     return uploaded.id
 
 def chat_with_pdf(assistant_id, file_id, user_message):
-    client = get_client()
-    # PDF 파일과 연결된 assistant_id가 필요함
-    # 실제 PDF 내용을 기반으로 질문을 처리하는 방식으로 구성할 수 있음
-    # 예시로 간단한 질문 답변을 생성하는 방식으로 수정할 수 있음
-    response = client.completions.create(
-        model="gpt-4o-mini",  # GPT-4.1 Mini 모델 사용
-        prompt=f"다음 PDF 파일에 대해 사용자 질문: {user_message}\n[PDF 내용 기반 응답]",
-        max_tokens=200,
-        temperature=0.7
+    openai.api_key = st.session_state.api_key
+    # 여기서 PDF에 대한 질문을 처리하는 방법을 수정해야 합니다.
+    response = openai.ChatCompletion.create(
+        model="gpt-4.1-mini",  # GPT-4.1 Mini 모델 사용
+        messages=[{"role": "system", "content": "PDF 기반 응답을 제공합니다."}, 
+                  {"role": "user", "content": user_message}],
+        temperature=0.7,
+        max_tokens=200
     )
-    return response.choices[0].text.strip()
+    return response.choices[0].message["content"].strip()
 
 def reset_session_state(clear_api_key=False):
     st.session_state.chat_history = []
