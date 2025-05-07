@@ -1,7 +1,7 @@
 import streamlit as st
 import openai
-import PyPDF2
-from io import BytesIO
+
+st.set_page_config(page_title="GPT-4.1 Mini Web App", layout="centered")
 
 # 세션 상태 초기화
 if "api_key" not in st.session_state:
@@ -10,56 +10,15 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "library_chat_history" not in st.session_state:
     st.session_state.library_chat_history = []
-if "pdf_text" not in st.session_state:
-    st.session_state.pdf_text = ""
+if "pdf_file_id" not in st.session_state:
+    st.session_state.pdf_file_id = None
+if "assistant_id" not in st.session_state:
+    st.session_state.assistant_id = None
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = None
+if "clear_flag" not in st.session_state:
+    st.session_state.clear_flag = False
 
-st.set_page_config(page_title="GPT-4.1 Mini Web App", layout="centered")
-
-# OpenAI API 설정
-openai.api_key = st.session_state.api_key
-
-def extract_text_from_pdf(uploaded_file):
-    try:
-        # PDF 텍스트 추출
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
-        text = ""
-        for page_num in range(len(pdf_reader.pages)):
-            page = pdf_reader.pages[page_num]
-            text += page.extract_text()
-        return text
-    except Exception as e:
-        st.error(f"PDF 파일을 읽는 중 오류 발생: {e}")
-        return ""
-
-def get_response_from_pdf(api_key: str, pdf_text: str, user_message: str) -> str:
-    openai.api_key = api_key
-    prompt = f"다음 PDF 내용을 바탕으로 질문에 대답하세요:\n{pdf_text}\n질문: {user_message}"
-    response = openai.Completion.create(
-        model="gpt-4.1-mini",  # GPT-4.1 Mini 모델 사용
-        prompt=prompt,
-        max_tokens=150,
-        temperature=0.7,
-    )
-    return response.choices[0].text.strip()
-
-def get_response(api_key: str, messages: list) -> str:
-    openai.api_key = api_key
-    response = openai.Completion.create(
-        model="gpt-4.1-mini",  # GPT-4.1 Mini 모델 사용
-        messages=messages,
-        max_tokens=150,
-        temperature=0.7,
-    )
-    return response.choices[0].text.strip()
-
-def reset_session_state(clear_api_key=False):
-    st.session_state.chat_history = []
-    st.session_state.library_chat_history = []
-    st.session_state.pdf_text = ""
-    if clear_api_key:
-        st.session_state.api_key = ""
-
-# 페이지 로직
 page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "Chatbot", "ChatPDF"])
 
 st.session_state.api_key = st.sidebar.text_input(
@@ -68,7 +27,75 @@ st.session_state.api_key = st.sidebar.text_input(
     value=st.session_state.api_key,
 )
 
-# Q&A 페이지
+def get_client():
+    return openai
+
+# OpenAI API 호출 함수
+def get_response(api_key: str, messages: list) -> str:
+    openai.api_key = api_key
+    response = openai.ChatCompletion.create(
+        model="gpt-4.1-mini",  # GPT-4.1 Mini 모델 사용
+        messages=messages,
+        max_tokens=150,
+        temperature=0.7,
+    )
+    return response['choices'][0]['message']['content'].strip()
+
+# PDF 업로드 함수
+def upload_pdf(file):
+    client = get_client()
+    uploaded = client.File.create(file=(file.name, file), purpose="answers")
+    return uploaded.id
+
+# 어시스턴트 생성 함수
+def create_assistant(file_id):
+    client = get_client()
+    assistant = client.Assistant.create(
+        name="PDF Chat Assistant",
+        instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
+        model="gpt-4.1-mini",
+        tools=[{"type": "file_search"}],
+        file_ids=[file_id],
+    )
+    return assistant.id
+
+# PDF와 대화하기 함수
+def chat_with_pdf(assistant_id, file_id, user_message):
+    client = get_client()
+    if not st.session_state.thread_id:
+        thread = client.Thread.create()
+        st.session_state.thread_id = thread.id
+    client.Thread.messages.create(
+        thread_id=st.session_state.thread_id,
+        role="user",
+        content=user_message,
+    )
+    run = client.Thread.runs.create(
+        thread_id=st.session_state.thread_id,
+        assistant_id=assistant_id,
+    )
+    with st.spinner("응답 생성 중..."):
+        while True:
+            run_status = client.Thread.runs.retrieve(
+                thread_id=st.session_state.thread_id,
+                run_id=run.id,
+            )
+            if run_status.status == "completed":
+                break
+        messages = client.Thread.messages.list(thread_id=st.session_state.thread_id)
+        return messages.data[0].content[0].text.value
+
+# 세션 초기화 함수
+def reset_session_state():
+    st.session_state.clear_flag = False
+    st.session_state.chat_history = []
+    st.session_state.library_chat_history = []
+    st.session_state.pdf_file_id = None
+    st.session_state.assistant_id = None
+    st.session_state.thread_id = None
+    st.session_state.api_key = ""
+
+# 페이지별 로직
 if page == "Q&A":
     st.title("GPT-4.1 Mini 질문 응답기")
     
@@ -76,7 +103,7 @@ if page == "Q&A":
     with col2:
         if st.button("Clear"):
             reset_session_state()
-
+    
     question = st.text_area("질문을 입력하세요:", height=100)
     if st.button("질문하기"):
         if question.strip() == "":
@@ -93,7 +120,6 @@ if page == "Q&A":
                 st.subheader("응답:")
                 st.write(answer)
 
-# Chat 페이지
 elif page == "Chat":
     st.title("GPT-4.1 Mini 챗봇")
     
@@ -101,7 +127,7 @@ elif page == "Chat":
     with col2:
         if st.button("Clear"):
             reset_session_state()
-
+    
     user_input = st.text_area("메시지를 입력하세요:", height=100)
     if st.button("질문하기"):
         if user_input.strip() == "":
@@ -117,7 +143,6 @@ elif page == "Chat":
         role = "사용자" if msg["role"] == "user" else "GPT"
         st.markdown(f"**{role}:** {msg['content']}")
 
-# Chatbot 페이지
 elif page == "Chatbot":
     st.title("국립부경대학교 도서관 챗봇")
     
@@ -125,7 +150,7 @@ elif page == "Chatbot":
     with col2:
         if st.button("Clear"):
             reset_session_state()
-
+    
     user_input = st.text_area("도서관에 대해 궁금한 점을 입력하세요:", height=100)
     library_regulations = """
     제20조(휴관일)
@@ -154,7 +179,6 @@ elif page == "Chatbot":
         role = "사용자" if msg["role"] == "user" else "도서관 챗봇"
         st.markdown(f"**{role}:** {msg['content']}")
 
-# ChatPDF 페이지
 elif page == "ChatPDF":
     st.title("ChatPDF - PDF 기반 챗봇")
     
@@ -164,24 +188,24 @@ elif page == "ChatPDF":
     with col2:
         if st.button("Clear"):
             reset_session_state()
-
+    
     if uploaded_file and st.session_state.api_key:
-        # PDF 파일에서 텍스트 추출
-        pdf_text = extract_text_from_pdf(uploaded_file)
-        if pdf_text:
-            st.session_state.pdf_text = pdf_text
-            st.success("PDF 파일에서 텍스트를 추출했습니다!")
-        
-        # PDF 업로드 후 사용자가 질문 입력
+        if not st.session_state.pdf_file_id:
+            file_id = upload_pdf(uploaded_file)
+            st.session_state.pdf_file_id = file_id
+            assistant_id = create_assistant(file_id)
+            st.session_state.assistant_id = assistant_id
+            st.success("PDF 업로드 및 어시스턴트 준비 완료!")
+    if st.session_state.pdf_file_id:
         user_question = st.text_area("PDF에 대해 질문해보세요:", height=100)
         if st.button("질문하기"):
             if user_question.strip() == "":
                 st.warning("질문을 입력해주세요.")
             else:
                 try:
-                    answer = get_response_from_pdf(
-                        st.session_state.api_key,
-                        st.session_state.pdf_text,
+                    answer = chat_with_pdf(
+                        st.session_state.assistant_id,
+                        st.session_state.pdf_file_id,
                         user_question
                     )
                     st.subheader("응답:")
