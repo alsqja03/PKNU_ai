@@ -124,11 +124,19 @@ elif page == "Chat":
 
 elif page == "Chatbot":
     st.title("국립부경대학교 도서관 챗봇")
+
+    if "clear_library_chat" not in st.session_state:
+        st.session_state.clear_library_chat = False
+
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
             st.session_state.library_chat_history = []
-            st.experimental_rerun()
+            st.session_state.clear_library_chat = True
+
+    if st.session_state.clear_library_chat:
+        st.session_state.clear_library_chat = False
+
     user_input = st.text_area("도서관에 대해 궁금한 점을 입력하세요:", height=100)
     library_regulations = """
     제1장 총칙
@@ -548,6 +556,7 @@ elif page == "Chatbot":
             ] + st.session_state.library_chat_history
             assistant_reply = get_response(st.session_state.api_key, messages)
             st.session_state.library_chat_history.append({"role": "assistant", "content": assistant_reply})
+
     for msg in st.session_state.library_chat_history:
         role = "사용자" if msg["role"] == "user" else "도서관 챗봇"
         st.markdown(f"**{role}:** {msg['content']}")
