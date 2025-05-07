@@ -1,8 +1,10 @@
 import streamlit as st
 import openai
 
+# 페이지 설정
 st.set_page_config(page_title="GPT-4.1 Mini Web App", layout="centered")
 
+# 세션 상태 설정
 if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 if "chat_history" not in st.session_state:
@@ -15,11 +17,11 @@ if "assistant_id" not in st.session_state:
     st.session_state.assistant_id = None
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
-if "clear_flag" not in st.session_state:
-    st.session_state.clear_flag = False
 
+# 페이지 선택
 page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "Chatbot", "ChatPDF"])
 
+# OpenAI API Key 입력
 st.session_state.api_key = st.sidebar.text_input(
     "OpenAI API Key 입력",
     type="password",
@@ -29,65 +31,15 @@ st.session_state.api_key = st.sidebar.text_input(
 def get_client():
     return openai.OpenAI(api_key=st.session_state.api_key)
 
-@st.cache_data
-def get_response(api_key: str, messages: list) -> str:
-    client = openai.OpenAI(api_key=api_key)
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=messages,
-        temperature=0.7,
-    )
-    return response.choices[0].message.content.strip()
-
-def upload_pdf(file):
-    client = get_client()
-    uploaded = client.files.create(file=(file.name, file), purpose="assistants")
-    return uploaded.id
-
-def create_assistant(file_id):
-    client = get_client()
-    assistant = client.beta.assistants.create(
-        name="PDF Chat Assistant",
-        instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
-        model="gpt-4o",
-        tools=[{"type": "file_search"}],
-        file_ids=[file_id],
-    )
-    return assistant.id
-
-def chat_with_pdf(assistant_id, file_id, user_message):
-    client = get_client()
-    if not st.session_state.thread_id:
-        thread = client.beta.threads.create()
-        st.session_state.thread_id = thread.id
-    client.beta.threads.messages.create(
-        thread_id=st.session_state.thread_id,
-        role="user",
-        content=user_message,
-    )
-    run = client.beta.threads.runs.create(
-        thread_id=st.session_state.thread_id,
-        assistant_id=assistant_id,
-    )
-    with st.spinner("응답 생성 중..."):
-        while True:
-            run_status = client.beta.threads.runs.retrieve(
-                thread_id=st.session_state.thread_id,
-                run_id=run.id,
-            )
-            if run_status.status == "completed":
-                break
-        messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
-        return messages.data[0].content[0].text.value
-
-def reset_session_state():
-    st.session_state.clear_flag = False
+# 세션 초기화 함수
+def reset_session_state(clear_api_key=False):
     st.session_state.chat_history = []
     st.session_state.library_chat_history = []
     st.session_state.pdf_file_id = None
     st.session_state.assistant_id = None
     st.session_state.thread_id = None
-    st.session_state.api_key = ""
+    if clear_api_key:
+        st.session_state.api_key = ""
 
 # 페이지별 로직
 if page == "Q&A":
@@ -96,7 +48,7 @@ if page == "Q&A":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state()
+            reset_session_state(clear_api_key=False)  # 메시지만 초기화
     
     question = st.text_area("질문을 입력하세요:", height=100)
     if st.button("질문하기"):
@@ -120,7 +72,7 @@ elif page == "Chat":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state()
+            reset_session_state(clear_api_key=False)  # 메시지만 초기화
     
     user_input = st.text_area("메시지를 입력하세요:", height=100)
     if st.button("질문하기"):
@@ -143,7 +95,7 @@ elif page == "Chatbot":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state()
+            reset_session_state(clear_api_key=False)  # 메시지만 초기화
     
     user_input = st.text_area("도서관에 대해 궁금한 점을 입력하세요:", height=100)
     library_regulations = """
@@ -576,7 +528,7 @@ elif page == "ChatPDF":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state()
+            reset_session_state(clear_api_key=False)  # 메시지만 초기화
     
     if uploaded_file and st.session_state.api_key:
         if not st.session_state.pdf_file_id:
