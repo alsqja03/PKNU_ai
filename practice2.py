@@ -601,4 +601,5 @@ elif page == "ChatPDF":
                     st.write(answer)
                 except Exception as e:
                     st.error(f"오류 발생: {e}")
-    elif uploaded_file and not st
+    elif uploaded_file and not st.session_state.api_key:
+        st.warning("API Key를 입력해 주세요.")
