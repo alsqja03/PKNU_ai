@@ -15,6 +15,8 @@ if "assistant_id" not in st.session_state:
     st.session_state.assistant_id = None
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
+if "clear_flag" not in st.session_state:
+    st.session_state.clear_flag = False
 
 page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "Chatbot", "ChatPDF"])
 
@@ -78,12 +80,24 @@ def chat_with_pdf(assistant_id, file_id, user_message):
         messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
         return messages.data[0].content[0].text.value
 
+def reset_session_state():
+    st.session_state.clear_flag = False
+    st.session_state.chat_history = []
+    st.session_state.library_chat_history = []
+    st.session_state.pdf_file_id = None
+    st.session_state.assistant_id = None
+    st.session_state.thread_id = None
+    st.session_state.api_key = ""
+
+# 페이지별 로직
 if page == "Q&A":
     st.title("GPT-4.1 Mini 질문 응답기")
+    
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            st.experimental_rerun()
+            reset_session_state()
+    
     question = st.text_area("질문을 입력하세요:", height=100)
     if st.button("질문하기"):
         if question.strip() == "":
@@ -102,11 +116,12 @@ if page == "Q&A":
 
 elif page == "Chat":
     st.title("GPT-4.1 Mini 챗봇")
+    
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            st.session_state.chat_history = []
-            st.experimental_rerun()
+            reset_session_state()
+    
     user_input = st.text_area("메시지를 입력하세요:", height=100)
     if st.button("질문하기"):
         if user_input.strip() == "":
@@ -124,19 +139,12 @@ elif page == "Chat":
 
 elif page == "Chatbot":
     st.title("국립부경대학교 도서관 챗봇")
-
-    if "clear_library_chat" not in st.session_state:
-        st.session_state.clear_library_chat = False
-
+    
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            st.session_state.library_chat_history = []
-            st.session_state.clear_library_chat = True
-
-    if st.session_state.clear_library_chat:
-        st.session_state.clear_library_chat = False
-
+            reset_session_state()
+    
     user_input = st.text_area("도서관에 대해 궁금한 점을 입력하세요:", height=100)
     library_regulations = """
     제1장 총칙
@@ -556,22 +564,20 @@ elif page == "Chatbot":
             ] + st.session_state.library_chat_history
             assistant_reply = get_response(st.session_state.api_key, messages)
             st.session_state.library_chat_history.append({"role": "assistant", "content": assistant_reply})
-
     for msg in st.session_state.library_chat_history:
         role = "사용자" if msg["role"] == "user" else "도서관 챗봇"
         st.markdown(f"**{role}:** {msg['content']}")
 
 elif page == "ChatPDF":
     st.title("ChatPDF - PDF 기반 챗봇")
+    
     uploaded_file = st.file_uploader("PDF 파일을 업로드하세요 (1개만)", type=["pdf"])
+    
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            st.session_state.pdf_file_id = None
-            st.session_state.assistant_id = None
-            st.session_state.thread_id = None
-            st.success("파일 및 대화 기록이 초기화되었습니다.")
-            st.experimental_rerun()
+            reset_session_state()
+    
     if uploaded_file and st.session_state.api_key:
         if not st.session_state.pdf_file_id:
             file_id = upload_pdf(uploaded_file)
@@ -595,5 +601,4 @@ elif page == "ChatPDF":
                     st.write(answer)
                 except Exception as e:
                     st.error(f"오류 발생: {e}")
-    elif uploaded_file and not st.session_state.api_key:
-        st.warning("API Key를 입력하세요.")
+    elif uploaded_file and not st
