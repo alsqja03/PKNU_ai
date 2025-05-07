@@ -15,7 +15,7 @@ if "pdf_file_id" not in st.session_state:
 if "assistant_id" not in st.session_state:
     st.session_state.assistant_id = None
 
-page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "Chatbot", "ChatPDF"])
+page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "ChatBot", "ChatPDF"])
 
 st.session_state.api_key = st.sidebar.text_input(
     "OpenAI API Key 입력",
@@ -40,31 +40,6 @@ def upload_pdf(file):
     client = get_client()
     uploaded = client.files.create(file=(file.name, file), purpose="assistants")
     return uploaded.id
-
-def create_assistant(file_id):
-    client = get_client()
-    try:
-        assistant = client.assistants.create(
-            name="PDF Chat Assistant",
-            instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
-            model="gpt-4o-mini",  # GPT-4.1 Mini 모델로 변경
-            tools=[{"type": "file_search"}],
-            file_ids=[file_id],
-        )
-        return assistant.id
-    except Exception as e:
-        st.error(f"어시스턴트 생성 중 오류 발생: {e}")
-        return None
-
-def chat_with_pdf(assistant_id, file_id, user_message):
-    client = get_client()
-    # Simple chat flow without thread management
-    messages = [
-        {"role": "system", "content": "당신은 친절한 AI 어시스턴트입니다."},
-        {"role": "user", "content": user_message}
-    ]
-    response = get_response(st.session_state.api_key, messages)
-    return response
 
 def reset_session_state(clear_api_key=False):
     st.session_state.chat_history = []
@@ -172,6 +147,23 @@ elif page == "ChatPDF":
         if not st.session_state.pdf_file_id:
             file_id = upload_pdf(uploaded_file)
             st.session_state.pdf_file_id = file_id
-            assistant_id = create_assistant(file_id)
-            st.session_state.assistant_id = assistant_id
-            st.success("PDF 업로드 및 어시스턴트 준비 완료!")
+            st.success("PDF 업로드 완료!")
+        
+        # PDF 업로드 후 사용자가 질문 입력
+        user_question = st.text_area("PDF에 대해 질문해보세요:", height=100)
+        if st.button("질문하기"):
+            if user_question.strip() == "":
+                st.warning("질문을 입력해주세요.")
+            else:
+                try:
+                    answer = chat_with_pdf(
+                        st.session_state.assistant_id,
+                        st.session_state.pdf_file_id,
+                        user_question
+                    )
+                    st.subheader("응답:")
+                    st.write(answer)
+                except Exception as e:
+                    st.error(f"오류 발생: {e}")
+    elif uploaded_file and not st.session_state.api_key:
+        st.warning("API Key를 입력해 주세요.")
