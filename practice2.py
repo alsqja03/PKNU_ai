@@ -1,10 +1,8 @@
 import streamlit as st
 import openai
 
-# 페이지 설정
 st.set_page_config(page_title="GPT-4.1 Mini Web App", layout="centered")
 
-# 세션 상태 설정
 if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 if "chat_history" not in st.session_state:
@@ -17,39 +15,79 @@ if "assistant_id" not in st.session_state:
     st.session_state.assistant_id = None
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
+if "clear_flag" not in st.session_state:
+    st.session_state.clear_flag = False
 
-# 페이지 선택
 page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "Chatbot", "ChatPDF"])
 
-# OpenAI API Key 입력
 st.session_state.api_key = st.sidebar.text_input(
     "OpenAI API Key 입력",
     type="password",
     value=st.session_state.api_key,
 )
 
-# OpenAI API 호출 함수
-def get_response(api_key, messages):
-    try:
-        openai.api_key = api_key
-        response = openai.ChatCompletion.create(
-            model="gpt-4.1-mini",  # GPT-4 모델을 사용합니다
-            messages=messages  # 메시지 목록을 전달
-        )
-        return response['choices'][0]['message']['content']
-    except Exception as e:
-        st.error(f"API 요청 오류: {e}")
-        return None
+def get_client():
+    return openai.OpenAI(api_key=st.session_state.api_key)
 
-# 세션 초기화 함수
-def reset_session_state(clear_api_key=False):
+@st.cache_data
+def get_response(api_key: str, messages: list) -> str:
+    client = openai.OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        temperature=0.7,
+    )
+    return response.choices[0].message.content.strip()
+
+def upload_pdf(file):
+    client = get_client()
+    uploaded = client.files.create(file=(file.name, file), purpose="assistants")
+    return uploaded.id
+
+def create_assistant(file_id):
+    client = get_client()
+    assistant = client.beta.assistants.create(
+        name="PDF Chat Assistant",
+        instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
+        model="gpt-4o",
+        tools=[{"type": "file_search"}],
+        file_ids=[file_id],
+    )
+    return assistant.id
+
+def chat_with_pdf(assistant_id, file_id, user_message):
+    client = get_client()
+    if not st.session_state.thread_id:
+        thread = client.beta.threads.create()
+        st.session_state.thread_id = thread.id
+    client.beta.threads.messages.create(
+        thread_id=st.session_state.thread_id,
+        role="user",
+        content=user_message,
+    )
+    run = client.beta.threads.runs.create(
+        thread_id=st.session_state.thread_id,
+        assistant_id=assistant_id,
+    )
+    with st.spinner("응답 생성 중..."):
+        while True:
+            run_status = client.beta.threads.runs.retrieve(
+                thread_id=st.session_state.thread_id,
+                run_id=run.id,
+            )
+            if run_status.status == "completed":
+                break
+        messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
+        return messages.data[0].content[0].text.value
+
+def reset_session_state():
+    st.session_state.clear_flag = False
     st.session_state.chat_history = []
     st.session_state.library_chat_history = []
     st.session_state.pdf_file_id = None
     st.session_state.assistant_id = None
     st.session_state.thread_id = None
-    if clear_api_key:
-        st.session_state.api_key = ""
+    st.session_state.api_key = ""
 
 # 페이지별 로직
 if page == "Q&A":
@@ -58,7 +96,7 @@ if page == "Q&A":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state(clear_api_key=False)  # 메시지만 초기화
+            reset_session_state()
     
     question = st.text_area("질문을 입력하세요:", height=100)
     if st.button("질문하기"):
@@ -73,9 +111,8 @@ if page == "Q&A":
                     {"role": "user", "content": question}
                 ]
                 answer = get_response(st.session_state.api_key, messages)
-                if answer:
-                    st.subheader("응답:")
-                    st.write(answer)
+                st.subheader("응답:")
+                st.write(answer)
 
 elif page == "Chat":
     st.title("GPT-4.1 Mini 챗봇")
@@ -83,7 +120,7 @@ elif page == "Chat":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state(clear_api_key=False)  # 메시지만 초기화
+            reset_session_state()
     
     user_input = st.text_area("메시지를 입력하세요:", height=100)
     if st.button("질문하기"):
@@ -95,8 +132,7 @@ elif page == "Chat":
             st.session_state.chat_history.append({"role": "user", "content": user_input})
             messages = [{"role": "system", "content": "당신은 친절하고 유용한 챗봇입니다."}] + st.session_state.chat_history
             assistant_reply = get_response(st.session_state.api_key, messages)
-            if assistant_reply:
-                st.session_state.chat_history.append({"role": "assistant", "content": assistant_reply})
+            st.session_state.chat_history.append({"role": "assistant", "content": assistant_reply})
     for msg in st.session_state.chat_history:
         role = "사용자" if msg["role"] == "user" else "GPT"
         st.markdown(f"**{role}:** {msg['content']}")
@@ -107,7 +143,7 @@ elif page == "Chatbot":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state(clear_api_key=False)  # 메시지만 초기화
+            reset_session_state()
     
     user_input = st.text_area("도서관에 대해 궁금한 점을 입력하세요:", height=100)
     library_regulations = """
@@ -132,8 +168,7 @@ elif page == "Chatbot":
                 {"role": "system", "content": f"당신은 국립부경대학교 도서관 규정에 대해 안내하는 챗봇입니다. 다음은 도서관 규정입니다:\n{library_regulations}"}
             ] + st.session_state.library_chat_history
             assistant_reply = get_response(st.session_state.api_key, messages)
-            if assistant_reply:
-                st.session_state.library_chat_history.append({"role": "assistant", "content": assistant_reply})
+            st.session_state.library_chat_history.append({"role": "assistant", "content": assistant_reply})
     for msg in st.session_state.library_chat_history:
         role = "사용자" if msg["role"] == "user" else "도서관 챗봇"
         st.markdown(f"**{role}:** {msg['content']}")
@@ -146,7 +181,7 @@ elif page == "ChatPDF":
     col1, col2 = st.columns([1, 1])
     with col2:
         if st.button("Clear"):
-            reset_session_state(clear_api_key=False)  # 메시지만 초기화
+            reset_session_state()
     
     if uploaded_file and st.session_state.api_key:
         if not st.session_state.pdf_file_id:
