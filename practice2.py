@@ -33,7 +33,7 @@ def get_response(api_key, messages):
     try:
         openai.api_key = api_key
         response = openai.ChatCompletion.create(
-            model="gpt-4",  # GPT-4 모델을 사용합니다
+            model="gpt-4.1-mini",  # GPT-4 모델을 사용합니다
             messages=messages  # 메시지 목록을 전달
         )
         return response['choices'][0]['message']['content']
