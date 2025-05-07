@@ -58,12 +58,12 @@ def upload_pdf(file):
 
 def create_assistant(file_id):
     client = get_client()
-    assistant = client.beta.assistants.create(
+    assistant = client.assistants.create(
         name="PDF Chat Assistant",
         instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
         model="gpt-4o",
         tools=[{"type": "file_search"}],
-        file_ids=[file_id],
+        files=[{"id": file_id}],  # file_ids 대신 files 사용
     )
     return assistant.id
 
