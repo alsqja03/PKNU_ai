@@ -56,8 +56,11 @@ def get_response(api_key: str, messages: list) -> str:
 
 def upload_pdf(file):
     client = get_client()
-    file_bytes = io.BytesIO(file.read())
-    uploaded = client.files.create(file=(file.name, file_bytes), purpose="assistants")
+    file.seek(0)  # 파일 포인터 초기화
+    uploaded = client.files.create(
+        file=(file.name, file),  # file은 파일 이름과 스트림 형태의 객체로 전달
+        purpose="assistants"
+    )
     return uploaded.id
 
 def create_assistant_with_vectorstore(file_id):
