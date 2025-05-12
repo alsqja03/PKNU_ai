@@ -1,6 +1,7 @@
 import streamlit as st
 import openai
 import time
+import io
 
 st.set_page_config(page_title="GPT-4o Mini Web App", layout="centered")
 
@@ -55,7 +56,8 @@ def get_response(api_key: str, messages: list) -> str:
 
 def upload_pdf(file):
     client = get_client()
-    uploaded = client.files.create(file=(file.name, file), purpose="assistants")
+    file_bytes = io.BytesIO(file.read())
+    uploaded = client.files.create(file=(file.name, file_bytes), purpose="assistants")
     return uploaded.id
 
 def create_assistant_with_vectorstore(file_id):
