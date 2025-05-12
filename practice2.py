@@ -4,7 +4,6 @@ import time
 
 st.set_page_config(page_title="GPT-4o Mini Web App", layout="centered")
 
-# 초기 세션 상태 설정
 if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 if "chat_history" not in st.session_state:
@@ -17,6 +16,10 @@ if "assistant_id" not in st.session_state:
     st.session_state.assistant_id = None
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
+if "vector_store_id" not in st.session_state:
+    st.session_state.vector_store_id = None
+if "clear_flag" not in st.session_state:
+    st.session_state.clear_flag = False
 if "qa_input" not in st.session_state:
     st.session_state.qa_input = ""
 if "chat_input" not in st.session_state:
@@ -26,10 +29,8 @@ if "library_input" not in st.session_state:
 if "pdf_input" not in st.session_state:
     st.session_state.pdf_input = ""
 
-# 페이지 선택
 page = st.sidebar.selectbox("페이지 선택", ["Q&A", "Chat", "Chatbot", "ChatPDF"])
 
-# API 키 입력
 st.session_state.api_key = st.sidebar.text_input(
     "OpenAI API Key 입력",
     type="password",
@@ -39,11 +40,9 @@ st.session_state.api_key = st.sidebar.text_input(
 if st.sidebar.button("API Key 초기화"):
     st.session_state.api_key = ""
 
-# 클라이언트 가져오기
 def get_client():
     return openai.OpenAI(api_key=st.session_state.api_key)
 
-# 응답 생성 함수 (캐시)
 @st.cache_data
 def get_response(api_key: str, messages: list) -> str:
     client = openai.OpenAI(api_key=api_key)
@@ -54,26 +53,30 @@ def get_response(api_key: str, messages: list) -> str:
     )
     return response.choices[0].message.content.strip()
 
-# PDF 업로드
 def upload_pdf(file):
     client = get_client()
     uploaded = client.files.create(file=(file.name, file), purpose="assistants")
     return uploaded.id
 
-# Assistant 생성
-def create_assistant(file_id):
+def create_assistant_with_vectorstore(file_id):
     client = get_client()
+    vector_store = client.beta.vector_stores.create(name="PDF Vector Store")
+    client.beta.vector_stores.file_batches.upload_and_poll(
+        vector_store_id=vector_store.id,
+        files=[file_id]
+    )
+    st.session_state.vector_store_id = vector_store.id
+
     assistant = client.beta.assistants.create(
         name="PDF Chat Assistant",
         instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
         model="gpt-4o-mini",
         tools=[{"type": "file_search"}],
-        file_ids=[file_id],
+        tool_resources={"file_search": {"vector_stores": [vector_store.id]}},
     )
     return assistant.id
 
-# PDF 질의 응답
-def chat_with_pdf(assistant_id, file_id, user_message):
+def chat_with_pdf(assistant_id, user_message):
     client = get_client()
     if not st.session_state.thread_id:
         thread = client.beta.threads.create()
@@ -99,19 +102,19 @@ def chat_with_pdf(assistant_id, file_id, user_message):
         messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
         return messages.data[0].content[0].text.value
 
-# 세션 초기화
 def reset_session_state():
+    st.session_state.clear_flag = False
     st.session_state.chat_history = []
     st.session_state.library_chat_history = []
     st.session_state.pdf_file_id = None
     st.session_state.assistant_id = None
     st.session_state.thread_id = None
+    st.session_state.vector_store_id = None
     st.session_state.qa_input = ""
     st.session_state.chat_input = ""
     st.session_state.library_input = ""
     st.session_state.pdf_input = ""
 
-# Q&A 페이지
 if page == "Q&A":
     st.title("GPT-4o Mini 질문 응답기")
     col1, col2 = st.columns([1, 1])
@@ -135,7 +138,6 @@ if page == "Q&A":
                 st.subheader("응답:")
                 st.write(answer)
 
-# Chat 페이지
 elif page == "Chat":
     st.title("GPT-4o Mini 챗봇")
     col1, col2 = st.columns([1, 1])
@@ -158,7 +160,6 @@ elif page == "Chat":
         role = "사용자" if msg["role"] == "user" else "GPT"
         st.markdown(f"**{role}:** {msg['content']}")
 
-# Chatbot (도서관)
 elif page == "Chatbot":
     st.title("국립부경대학교 도서관 챗봇")
     col1, col2 = st.columns([1, 1])
@@ -194,9 +195,9 @@ elif page == "Chatbot":
         role = "사용자" if msg["role"] == "user" else "도서관 챗봇"
         st.markdown(f"**{role}:** {msg['content']}")
 
-# ChatPDF 페이지
 elif page == "ChatPDF":
     st.title("ChatPDF - PDF 기반 챗봇")
+
     uploaded_file = st.file_uploader("PDF 파일을 업로드하세요 (1개만)", type=["pdf"])
 
     col1, col2 = st.columns([1, 1])
@@ -209,7 +210,7 @@ elif page == "ChatPDF":
             try:
                 file_id = upload_pdf(uploaded_file)
                 st.session_state.pdf_file_id = file_id
-                assistant_id = create_assistant(file_id)
+                assistant_id = create_assistant_with_vectorstore(file_id)
                 st.session_state.assistant_id = assistant_id
                 st.success("PDF 업로드 및 어시스턴트 준비 완료!")
             except Exception as e:
@@ -224,7 +225,6 @@ elif page == "ChatPDF":
                 try:
                     answer = chat_with_pdf(
                         st.session_state.assistant_id,
-                        st.session_state.pdf_file_id,
                         st.session_state.pdf_input
                     )
                     st.subheader("응답:")
