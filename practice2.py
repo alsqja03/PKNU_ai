@@ -60,7 +60,7 @@ def upload_pdf(file):
 
 def create_assistant_with_vectorstore(file_id):
     client = get_client()
-    vector_store = client.beta.vector_stores.create(name="PDF Vector Store")
+    vector_store = client.vector_stores.create(name="PDF Vector Store")
     client.beta.vector_stores.file_batches.upload_and_poll(
         vector_store_id=vector_store.id,
         files=[file_id]
