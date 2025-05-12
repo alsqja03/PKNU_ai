@@ -61,13 +61,13 @@ def upload_pdf(file):
 def create_assistant_with_vectorstore(file_id):
     client = get_client()
     vector_store = client.vector_stores.create(name="PDF Vector Store")
-    client.beta.vector_stores.file_batches.upload_and_poll(
+    client.vector_stores.file_batches.upload_and_poll(
         vector_store_id=vector_store.id,
         files=[file_id]
     )
     st.session_state.vector_store_id = vector_store.id
 
-    assistant = client.beta.assistants.create(
+    assistant = client.assistants.create(
         name="PDF Chat Assistant",
         instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
         model="gpt-4o-mini",
@@ -79,27 +79,27 @@ def create_assistant_with_vectorstore(file_id):
 def chat_with_pdf(assistant_id, user_message):
     client = get_client()
     if not st.session_state.thread_id:
-        thread = client.beta.threads.create()
+        thread = client.threads.create()
         st.session_state.thread_id = thread.id
-    client.beta.threads.messages.create(
+    client.threads.messages.create(
         thread_id=st.session_state.thread_id,
         role="user",
         content=user_message,
     )
-    run = client.beta.threads.runs.create(
+    run = client.threads.runs.create(
         thread_id=st.session_state.thread_id,
         assistant_id=assistant_id,
     )
     with st.spinner("응답 생성 중..."):
         while True:
-            run_status = client.beta.threads.runs.retrieve(
+            run_status = client.threads.runs.retrieve(
                 thread_id=st.session_state.thread_id,
                 run_id=run.id,
             )
             if run_status.status == "completed":
                 break
             time.sleep(1)
-        messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
+        messages = client.threads.messages.list(thread_id=st.session_state.thread_id)
         return messages.data[0].content[0].text.value
 
 def reset_session_state():
