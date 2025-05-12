@@ -2,6 +2,8 @@ import streamlit as st
 import openai
 import time
 import io
+import tempfile
+from pathlib import Path
 
 st.set_page_config(page_title="GPT-4o Mini Web App", layout="centered")
 
@@ -56,9 +58,15 @@ def get_response(api_key: str, messages: list) -> str:
 
 def upload_pdf(file):
     client = get_client()
-    file.seek(0)  # 파일 포인터 초기화
+    
+    # 임시 파일로 저장
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(file.read())
+        tmp_path = Path(tmp.name)
+    
+    # Path 객체로 업로드
     uploaded = client.files.create(
-        file=(file.name, file),  # file은 파일 이름과 스트림 형태의 객체로 전달
+        file=tmp_path,
         purpose="assistants"
     )
     return uploaded.id
