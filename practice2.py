@@ -58,15 +58,9 @@ def get_response(api_key: str, messages: list) -> str:
 
 def upload_pdf(file):
     client = get_client()
-    
-    # 임시 파일로 저장
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        tmp.write(file.read())
-        tmp_path = Path(tmp.name)
-    
-    # Path 객체로 업로드
+    file_bytes = file.read()
     uploaded = client.files.create(
-        file=tmp_path,
+        file=(file.name, file_bytes, "application/pdf"),
         purpose="assistants"
     )
     return uploaded.id
