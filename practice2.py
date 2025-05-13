@@ -60,6 +60,13 @@ def get_response(api_key: str, messages: list) -> str:
     )
     return response.choices[0].message.content.strip()
 
+def load_rules():
+    try:
+        with open("library_rules.txt", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "도서관 규정 파일을 찾을 수 없습니다."
+
 def extract_text_from_pdf(file) -> str:
     reader = PyPDF2.PdfReader(file)
     return "\n".join([page.extract_text() or "" for page in reader.pages])
@@ -217,11 +224,20 @@ elif page == "Chatbot":
 
 elif page == "ChatPDF":
     st.title("ChatPDF - PDF 기반 챗봇")
+
+    if "pdf_chat_history" not in st.session_state:
+        st.session_state.pdf_chat_history = []
+    if "pdf_input" not in st.session_state:
+        st.session_state.pdf_input = ""
+
     uploaded_file = st.file_uploader("PDF 파일 업로드", type="pdf")
+
     if st.button("Clear PDF", key="clear_button_chatpdf"):
         st.session_state.pdf_chunks = []
         st.session_state.pdf_embeddings = []
-        st.success("PDF 데이터가 초기화되었습니다.")
+        st.session_state.pdf_input = ""
+        st.session_state.pdf_chat_history = []
+        st.success("PDF 데이터 및 대화 기록이 초기화되었습니다.")
 
     if uploaded_file and st.session_state.api_key:
         with st.spinner("PDF 분석 중..."):
@@ -234,17 +250,20 @@ elif page == "ChatPDF":
             st.success(f"{len(chunks)}개의 청크로 분할 및 임베딩 완료!")
 
     if st.session_state.pdf_chunks:
-        query = st.text_input("PDF 내용 기반 질문을 입력하세요:")
-        if query:
+        st.session_state.pdf_input = st.text_input("PDF 내용 기반 질문을 입력하세요:", value=st.session_state.pdf_input)
+        if st.session_state.pdf_input:
             with st.spinner("응답 생성 중..."):
-                context = search_similar_chunks(query, st.session_state.pdf_chunks, st.session_state.pdf_embeddings)
-                answer = ask_pdf_bot(query, context)
-                st.markdown("### 📄 GPT 응답")
-                st.write(answer)
+                context = search_similar_chunks(
+                    st.session_state.pdf_input,
+                    st.session_state.pdf_chunks,
+                    st.session_state.pdf_embeddings
+                )
+                answer = ask_pdf_bot(st.session_state.pdf_input, context)
+                st.session_state.pdf_chat_history.append(
+                    {"user": st.session_state.pdf_input, "bot": answer}
+                )
 
-def load_rules():
-    try:
-        with open("library_rules.txt", "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return "도서관 규정 파일을 찾을 수 없습니다."
+    for chat in st.session_state.get("pdf_chat_history", []):
+        st.markdown(f"**사용자:** {chat['user']}")
+        st.markdown(f"**GPT 응답:** {chat['bot']}")
+        
