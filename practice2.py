@@ -1,9 +1,9 @@
 import streamlit as st
 import openai
 import time
-import io
-import tempfile
-from pathlib import Path
+import PyPDF2
+import numpy as np
+from typing import List
 
 st.set_page_config(page_title="GPT-4o Mini Web App", layout="centered")
 
