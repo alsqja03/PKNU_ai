@@ -56,58 +56,76 @@ def get_response(api_key: str, messages: list) -> str:
     )
     return response.choices[0].message.content.strip()
 
-def upload_pdf(file):
-    client = get_client()
-    file_bytes = file.read()
-    uploaded = client.files.create(
-        file=(file.name, file_bytes, "application/pdf"),
-        purpose="assistants"
-    )
-    return uploaded.id
+def extract_text_from_pdf(file) -> str:
+    reader = PyPDF2.PdfReader(file)
+    return "\n".join([page.extract_text() or "" for page in reader.pages])
 
-def create_assistant_with_vectorstore(file_id):
-    client = get_client()
-    vector_store = client.vector_stores.create(name="PDF Vector Store")
-    client.vector_stores.file_batches.upload_and_poll(
-        vector_store_id=vector_store.id,
-        files=[file_id]
-    )
-    st.session_state.vector_store_id = vector_store.id
+def chunk_text(text: str, max_tokens=500) -> List[str]:
+    sentences = text.split(". ")
+    chunks = []
+    chunk = ""
+    for sentence in sentences:
+        if len(chunk + sentence) < max_tokens:
+            chunk += sentence + ". "
+        else:
+            chunks.append(chunk.strip())
+            chunk = sentence + ". "
+    if chunk:
+        chunks.append(chunk.strip())
+    return chunks
 
-    assistant = client.assistants.create(
-        name="PDF Chat Assistant",
-        instructions="사용자가 업로드한 PDF 내용을 기반으로 친절하게 답변하세요.",
-        model="gpt-4o-mini",
-        tools=[{"type": "file_search"}],
-        tool_resources={"file_search": {"vector_stores": [vector_store.id]}},
-    )
-    return assistant.id
-
-def chat_with_pdf(assistant_id, user_message):
+def embed_chunks(chunks: List[str]):
     client = get_client()
-    if not st.session_state.thread_id:
-        thread = client.threads.create()
-        st.session_state.thread_id = thread.id
-    client.threads.messages.create(
-        thread_id=st.session_state.thread_id,
-        role="user",
-        content=user_message,
+    # 빈 문자열, None 제거
+    clean_chunks = [chunk for chunk in chunks if isinstance(chunk, str) and chunk.strip()]
+    if not clean_chunks:
+        raise ValueError("입력할 유효한 텍스트 청크가 없습니다.")
+    response = client.embeddings.create(
+        input=clean_chunks,
+        model="text-embedding-3-small"
     )
-    run = client.threads.runs.create(
-        thread_id=st.session_state.thread_id,
-        assistant_id=assistant_id,
+    return [item.embedding for item in response.data]
+
+def cosine_similarity(a, b):
+    a = np.array(a)
+    b = np.array(b)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+def search_similar_chunks(query: str, chunks: List[str], embeddings: List[List[float]], k=3):
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("Query는 비어있거나 유효하지 않습니다.")
+    
+    client = get_client()
+    query_embedding = client.embeddings.create(
+        input=[query],
+        model="text-embedding-3-small"
+    ).data[0].embedding
+    
+    similarities = [cosine_similarity(query_embedding, emb) for emb in embeddings]
+    top_indices = np.argsort(similarities)[::-1][:k]
+    return "\n\n".join([chunks[i] for i in top_indices])
+
+def ask_pdf_bot(query: str, context: str):
+    client = get_client()
+    response = client.chat.completions.create(
+        model="gpt-4-1106-preview",
+        messages=[
+            {"role": "system", "content": "다음 문서를 참고하여 질문에 답하세요:\n" + context},
+            {"role": "user", "content": query}
+        ]
     )
-    with st.spinner("응답 생성 중..."):
-        while True:
-            run_status = client.threads.runs.retrieve(
-                thread_id=st.session_state.thread_id,
-                run_id=run.id,
-            )
-            if run_status.status == "completed":
-                break
-            time.sleep(1)
-        messages = client.threads.messages.list(thread_id=st.session_state.thread_id)
-        return messages.data[0].content[0].text.value
+    return response.choices[0].message.content.strip()
+
+def get_single_response(prompt: str):
+    client = get_client()
+    response = client.chat.completions.create(
+        model="gpt-4-1106-preview",
+        messages=[
+            {"role": "system", "content": "당신은 친절한 AI 비서입니다."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return response.choices[0].message.content.strip()
 
 def reset_session_state():
     st.session_state.clear_flag = False
@@ -599,39 +617,33 @@ elif page == "Chatbot":
 
 elif page == "ChatPDF":
     st.title("ChatPDF - PDF 기반 챗봇")
-
-    uploaded_file = st.file_uploader("PDF 파일을 업로드하세요 (1개만)", type=["pdf"])
-
-    col1, col2 = st.columns([1, 1])
-    with col2:
-        if st.button("Clear"):
-            reset_session_state()
+    uploaded_file = st.file_uploader("PDF 파일 업로드", type="pdf")
+    if st.button("Clear PDF", key="clear_button_chatpdf"):
+        st.session_state.pdf_chunks = []
+        st.session_state.pdf_embeddings = []
+        st.success("PDF 데이터가 초기화되었습니다.")
 
     if uploaded_file and st.session_state.api_key:
-        if not st.session_state.pdf_file_id:
-            try:
-                file_id = upload_pdf(uploaded_file)
-                st.session_state.pdf_file_id = file_id
-                assistant_id = create_assistant_with_vectorstore(file_id)
-                st.session_state.assistant_id = assistant_id
-                st.success("PDF 업로드 및 어시스턴트 준비 완료!")
-            except Exception as e:
-                st.error(f"어시스턴트 생성 중 오류 발생: {e}")
+        with st.spinner("PDF 분석 중..."):
+            raw_text = extract_text_from_pdf(uploaded_file)
+            chunks = chunk_text(raw_text)
+            embeddings = embed_chunks(chunks)
 
-    if st.session_state.pdf_file_id and st.session_state.assistant_id:
-        st.session_state.pdf_input = st.text_area("PDF에 대해 질문해보세요:", value=st.session_state.pdf_input, height=100)
-        if st.button("질문하기"):
-            if st.session_state.pdf_input.strip() == "":
-                st.warning("질문을 입력해주세요.")
-            else:
-                try:
-                    answer = chat_with_pdf(
-                        st.session_state.assistant_id,
-                        st.session_state.pdf_input
-                    )
-                    st.subheader("응답:")
-                    st.write(answer)
-                except Exception as e:
-                    st.error(f"오류 발생: {e}")
-    elif uploaded_file and not st.session_state.api_key:
-        st.warning("API Key를 입력해 주세요.")
+            st.session_state.pdf_chunks = chunks
+            st.session_state.pdf_embeddings = embeddings
+            st.success(f"{len(chunks)}개의 청크로 분할 및 임베딩 완료!")
+
+    if st.session_state.pdf_chunks:
+        query = st.text_input("PDF 내용 기반 질문을 입력하세요:")
+        if query:
+            with st.spinner("응답 생성 중..."):
+                context = search_similar_chunks(query, st.session_state.pdf_chunks, st.session_state.pdf_embeddings)
+                answer = ask_pdf_bot(query, context)
+                st.markdown("### 📄 GPT 응답")
+                st.write(answer)
+
+def load_rules():
+    with open("library_rules.txt", "r", encoding="utf-8") as f:
+        return f.read()
+
+library_rules = load_rules()
