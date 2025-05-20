@@ -22,14 +22,14 @@ def extract_text_from_txt(uploaded_file):
 def get_chat_response(api_key, messages):
     client = openai.OpenAI(api_key=api_key)
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=messages,
         temperature=0.7
     )
     return response.choices[0].message.content
 
 st.set_page_config(page_title="GPT 챗봇", layout="wide")
-st.title("GPT-4 챗봇")
+st.title("GPT-4o 챗봇")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -48,13 +48,14 @@ if not st.session_state.api_key:
 pdf_file = st.file_uploader("PDF 파일 업로드", type=["pdf"])
 txt_file = st.file_uploader("TXT 파일 업로드", type=["txt"])
 
-user_input = st.text_area("질문을 입력하세요", height=100)
+user_input = st.text_area("질문을 입력하세요", height=100, key="user_input")
 submit = st.button("질문하기")
 
 if st.button("대화 초기화"):
     st.session_state.messages = [
         {"role": "system", "content": "당신은 웹 검색, PDF 분석, 코드 파일 분석이 가능한 GPT-4 도우미입니다."}
     ]
+    st.session_state.user_input = ""
     st.experimental_rerun()
 
 if submit and user_input:
@@ -71,15 +72,16 @@ if submit and user_input:
     web_result = search_web(user_input)
     context += "\n\n[웹 검색 결과]\n" + web_result
 
-    st.session_state.messages.append({
-        "role": "user",
-        "content": f"{user_input}\n\n[참고 자료]\n{context}"
-    })
+    full_prompt = f"{user_input}\n\n[참고 자료]\n{context}"
+
+    st.session_state.messages.append({"role": "user", "content": full_prompt})
 
     with st.spinner("응답을 생성 중입니다..."):
         assistant_reply = get_chat_response(st.session_state.api_key, st.session_state.messages)
 
     st.session_state.messages.append({"role": "assistant", "content": assistant_reply})
+
+    st.session_state.user_input = ""
 
 for msg in st.session_state.messages[1:]:
     st.markdown(f"{msg['role'].capitalize()}: {msg['content']}")
