@@ -3,3 +3,5 @@ PyPDF2
 pathlib
 PyMuPDF
 numpy
+pdfplumber
+duckduckgo_search
