@@ -1,11 +1,11 @@
 import streamlit as st
-from io import BytesIO
+from PIL import Image
+import pytesseract
 import openai
 
-# Streamlit 앱 제목
-st.title("이미지+텍스트 질문 GPT-4o 챗봇")
+st.title("이미지 텍스트 추출 + GPT-4o 질문 챗봇")
 
-# 1. API 키 입력받기 (보안상 session_state에 저장)
+# API 키 입력
 if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 
@@ -19,37 +19,45 @@ if not st.session_state.api_key:
 
 openai.api_key = st.session_state.api_key
 
-# 2. 이미지 업로드 받기
-uploaded_image = st.file_uploader("질문과 관련된 이미지를 업로드하세요", type=["png", "jpg", "jpeg"])
+# 이미지 업로드
+uploaded_file = st.file_uploader("이미지를 업로드하세요", type=["png", "jpg", "jpeg"])
 
-# 3. 질문 텍스트 입력받기
+# 질문 입력
 user_question = st.text_input("질문을 입력하세요")
 
-def ask_gpt_with_image(question: str, image_bytes: bytes) -> str:
-    # GPT-4o 모델에 이미지와 텍스트 함께 보내기 (ChatCompletion with messages + image)
-    # 현재 openai Python SDK에서 이미지 입력 예시는 없으므로 이미지 기반 텍스트 추출(ocr) 등은 별도 처리 필요.
-    # 여기서는 이미지가 있다고 가정하고 메시지만 보내는 예시로 구현합니다.
-    
-    # 실제로 이미지 기반 질문이라면, 먼저 OCR 처리해서 텍스트를 추출 후 질문에 포함시키는 방식을 권장합니다.
-    # 여기서는 이미지가 있다는 정보만 시스템에 알려줌
-    
+def extract_text_from_image(image: Image.Image) -> str:
+    # pytesseract로 이미지에서 텍스트 추출
+    text = pytesseract.image_to_string(image, lang='kor+eng')  # 한글+영어 추출 가능
+    return text.strip()
+
+def ask_gpt(question: str, extracted_text: str) -> str:
+    prompt = f"""아래는 이미지에서 추출한 텍스트입니다:
+---
+{extracted_text}
+
+이 텍스트를 참고하여 사용자의 질문에 답변해 주세요:
+{question}
+"""
     messages = [
-        {"role": "system", "content": "당신은 이미지가 첨부된 질문에 답하는 챗봇입니다."},
-        {"role": "user", "content": f"이미지가 첨부되어 있습니다. 질문: {question}"}
+        {"role": "system", "content": "당신은 이미지에서 추출한 텍스트를 참고해 질문에 답변하는 유능한 비서입니다."},
+        {"role": "user", "content": prompt}
     ]
-    
-    response = openai.ChatCompletion.create(
+    response = openai.chat.completions.create(
         model="gpt-4o",
         messages=messages,
         temperature=0.5,
     )
-    
     return response.choices[0].message.content.strip()
 
-if uploaded_image and user_question:
-    image_bytes = uploaded_image.read()
+if uploaded_file and user_question:
+    image = Image.open(uploaded_file)
+    with st.spinner("이미지에서 텍스트를 추출하는 중입니다..."):
+        extracted_text = extract_text_from_image(image)
+    st.markdown("### 이미지에서 추출한 텍스트:")
+    st.write(extracted_text or "텍스트가 감지되지 않았습니다.")
+
     with st.spinner("GPT-4o 모델이 답변을 생성 중입니다..."):
-        answer = ask_gpt_with_image(user_question, image_bytes)
+        answer = ask_gpt(user_question, extracted_text)
     st.markdown("### GPT-4o 답변:")
     st.write(answer)
 elif user_question:
