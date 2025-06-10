@@ -1,11 +1,15 @@
 import streamlit as st
 import requests
 
-# 카카오 REST API 키
-KAKAO_REST_API_KEY = "	12ef3a654aaaed8710e1f5a04454d0a2"
-# 카카오 JavaScript API 키
-KAKAO_JS_API_KEY = "16dad1fa420e90b7d6cfef4f8e5ec429"
+# API 키를 세션에 저장 (처음 입력한 경우만)
+if "rest_api_key" not in st.session_state and KAKAO_REST_API_KEY:
+    st.session_state.rest_api_key = KAKAO_REST_API_KEY
+if "js_api_key" not in st.session_state and KAKAO_JS_API_KEY:
+    st.session_state.js_api_key = KAKAO_JS_API_KEY
 
+# 현재 사용할 API 키 확인
+current_rest_api_key = st.session_state.get("rest_api_key", "")
+current_js_api_key = st.session_state.get("js_api_key", "")
 def get_coordinates(address):
     url = "https://dapi.kakao.com/v2/local/search/address.json"
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
