@@ -5,17 +5,34 @@ from streamlit_folium import st_folium
 
 # 주소 → 좌표 변환 함수
 def address_to_coord(address, kakao_api_key):
-    url = "https://dapi.kakao.com/v2/local/search/address.json"
+    # 1️⃣ 주소 검색 시도
+    url_address = "https://dapi.kakao.com/v2/local/search/address.json"
     headers = {"Authorization": f"KakaoAK {kakao_api_key}"}
     params = {"query": address}
-    response = requests.get(url, headers=headers, params=params).json()
+    
+    response = requests.get(url_address, headers=headers, params=params).json()
     documents = response.get("documents", [])
+    
     if documents:
         x = float(documents[0]["x"])
         y = float(documents[0]["y"])
         return x, y
-    else:
-        return None, None
+    
+    # 2️⃣ 주소 검색 실패 시 → 키워드 검색 fallback
+    url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
+    params_keyword = {"query": address}
+    
+    response_keyword = requests.get(url_keyword, headers=headers, params=params_keyword).json()
+    documents_keyword = response_keyword.get("documents", [])
+    
+    if documents_keyword:
+        x = float(documents_keyword[0]["x"])
+        y = float(documents_keyword[0]["y"])
+        st.info(f"⚠️ 주소 검색 실패 → 키워드 검색 결과 사용: {documents_keyword[0]['place_name']}")
+        return x, y
+    
+    # 3️⃣ 완전히 실패
+    return None, None
 
 # TMAP 경로 요청 함수
 def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
