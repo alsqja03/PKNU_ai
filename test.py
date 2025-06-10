@@ -96,17 +96,17 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
         else:
             summary = None
 
-        elif route_type == "대중교통":
-            url = "https://apis.openapi.sk.com/transit/routes"
-            payload = {
-                "startX": str(start_x),
-                "startY": str(start_y),
-                "endX": str(end_x),
-                "endY": str(end_y)
+    elif route_type == "대중교통":
+        url = "https://apis.openapi.sk.com/transit/routes"
+        payload = {
+            "startX": str(start_x),
+            "startY": str(start_y),
+            "endX": str(end_x),
+            "endY": str(end_y)
             }
-            response = requests.post(url, headers=headers, json=payload)
-            data = response.json()
-            st.write(data)  # 여기서 응답 확인
+        response = requests.post(url, headers=headers, json=payload)
+        data = response.json()
+        st.write(data)  # 여기서 응답 확인
         else:
             st.warning("대중교통 경로를 찾을 수 없습니다.")
 
