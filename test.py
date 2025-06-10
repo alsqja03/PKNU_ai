@@ -19,33 +19,61 @@ if "js_api_key" not in st.session_state and KAKAO_JS_API_KEY:
 current_rest_api_key = st.session_state.get("rest_api_key", "")
 current_js_api_key = st.session_state.get("js_api_key", "")
 
-# --- 좌표 가져오기 함수 ---
 def get_coordinates(address):
-    url = "https://dapi.kakao.com/v2/local/search/address.json"
+    # 1️⃣ 먼저 address.json 호출
+    url_address = "https://dapi.kakao.com/v2/local/search/address.json"
     headers = {"Authorization": f"KakaoAK {current_rest_api_key}"}
     params = {"query": address.strip()}
 
-    response = requests.get(url, headers=headers, params=params)
+    response_address = requests.get(url_address, headers=headers, params=params)
 
-    # 디버깅 정보 출력
-    st.write(f"📍 검색 주소: {address}")
-    st.write(f"🔗 요청 URL: {response.url}")
-    st.write(f"✅ 응답 상태 코드: {response.status_code}")
+    st.write(f"📍 (주소 검색) 검색 주소: {address}")
+    st.write(f"🔗 요청 URL: {response_address.url}")
+    st.write(f"✅ 응답 상태 코드: {response_address.status_code}")
 
     try:
-        response_json = response.json()
-        st.json(response_json)
+        response_json_address = response_address.json()
+        st.json(response_json_address)
     except Exception as e:
-        st.error(f"응답 JSON 파싱 오류: {e}")
+        st.error(f"응답 JSON 파싱 오류 (주소): {e}")
         return None, None
 
-    if response.status_code == 200:
-        documents = response_json.get("documents")
+    if response_address.status_code == 200:
+        documents = response_json_address.get("documents")
         if documents:
             x = documents[0]["x"]
             y = documents[0]["y"]
+            st.info("✅ 주소 검색 성공")
             return float(x), float(y)
 
+    # 2️⃣ 주소 결과 없으면 → keyword.json 호출
+    st.warning("⚠️ 주소 검색 결과 없음 → 키워드 검색 시도")
+
+    url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
+    params_keyword = {"query": address.strip(), "size": 1}
+
+    response_keyword = requests.get(url_keyword, headers=headers, params=params_keyword)
+
+    st.write(f"📍 (키워드 검색) 검색 주소: {address}")
+    st.write(f"🔗 요청 URL: {response_keyword.url}")
+    st.write(f"✅ 응답 상태 코드: {response_keyword.status_code}")
+
+    try:
+        response_json_keyword = response_keyword.json()
+        st.json(response_json_keyword)
+    except Exception as e:
+        st.error(f"응답 JSON 파싱 오류 (키워드): {e}")
+        return None, None
+
+    if response_keyword.status_code == 200:
+        documents = response_json_keyword.get("documents")
+        if documents:
+            x = documents[0]["x"]
+            y = documents[0]["y"]
+            st.info("✅ 키워드 검색 성공")
+            return float(x), float(y)
+
+    # 3️⃣ 둘 다 실패
     return None, None
 
 # --- UI 입력 ---
