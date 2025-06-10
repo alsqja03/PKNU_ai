@@ -34,13 +34,10 @@ def address_to_coord(address, kakao_api_key):
     # 3️⃣ 완전히 실패
     return None, None
 
-# TMAP 경로 요청 함수
+# TMAP 경로 요청 함수 + 요약 정보 반환
 def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
     url = "https://apis.openapi.sk.com/tmap/routes/pedestrian"  # 기본 도보
     if route_type == "자동차":
-        url = "https://apis.openapi.sk.com/tmap/routes"
-    elif route_type == "대중교통":
-        st.warning("TMAP API에서 대중교통은 Web API 미지원 (모바일 SDK 전용). 도보/자동차만 지원됩니다.")
         url = "https://apis.openapi.sk.com/tmap/routes"
 
     headers = {
@@ -64,7 +61,20 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
 
     response = requests.post(url, headers=headers, json=payload).json()
     features = response.get("features", [])
-    return features
+
+    # 요약 정보 추출
+    if features:
+        properties = features[0].get("properties", {})
+        summary = {
+            "totalDistance": properties.get("totalDistance", 0),  # meter
+            "totalTime": properties.get("totalTime", 0),          # second
+            "totalFare": properties.get("totalFare", 0),          # 원
+            "taxiFare": properties.get("taxiFare", 0)             # 원
+        }
+    else:
+        summary = None
+
+    return features, summary
 
 # Streamlit UI 구성
 st.title("🚗 경로 검색 웹앱 (카카오맵 + TMAP API)")
@@ -78,7 +88,7 @@ tmap_api_key = st.sidebar.text_input("TMAP API Key", type="password")
 st.header("🗺️ 경로 설정")
 start_address = st.text_input("출발지 입력", "서울역")
 end_address = st.text_input("도착지 입력", "강남역")
-route_type = st.selectbox("경로 유형 선택", ["도보", "자동차", "대중교통"])
+route_type = st.selectbox("경로 유형 선택", ["도보", "자동차"])  # 대중교통 삭제
 
 # 경로 검색 버튼
 if st.button("경로 검색"):
@@ -92,19 +102,32 @@ if st.button("경로 검색"):
             st.error("출발지 또는 도착지 주소를 찾을 수 없습니다.")
         else:
             st.success(f"출발지 좌표: ({start_y}, {start_x})\n도착지 좌표: ({end_y}, {end_x})")
-            features = get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key)
+            features, summary = get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key)
 
             # 지도 데이터 session state에 저장
             st.session_state['map_features'] = features
             st.session_state['start_coord'] = (start_y, start_x)
             st.session_state['end_coord'] = (end_y, end_x)
+            st.session_state['route_summary'] = summary
 
-# 지도 렌더링
+# 지도 렌더링 + 요약 정보 표시
 if 'map_features' in st.session_state:
     features = st.session_state['map_features']
     start_y, start_x = st.session_state['start_coord']
     end_y, end_x = st.session_state['end_coord']
+    summary = st.session_state['route_summary']
 
+    # 📋 경로 요약 정보 표시
+    if summary:
+        totalDistance_km = summary["totalDistance"] / 1000
+        totalTime_min = summary["totalTime"] / 60
+        st.subheader("📊 경로 요약 정보")
+        st.write(f"**총 거리:** {totalDistance_km:.1f} km")
+        st.write(f"**총 소요 시간:** {totalTime_min:.0f} 분")
+        st.write(f"**총 요금:** {summary['totalFare']} 원")
+        st.write(f"**예상 택시 요금:** {summary['taxiFare']} 원")
+
+    # 지도 그리기
     m = folium.Map(location=[(start_y + end_y) / 2, (start_x + end_x) / 2], zoom_start=13)
 
     # 출발지/도착지 마커 추가
