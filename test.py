@@ -39,54 +39,107 @@ def address_to_coord(address, kakao_api_key):
 
 # TMAP 경로 요청 함수 + 요약 정보 반환
 def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
-    if route_type == "자동차":
-        url = "https://apis.openapi.sk.com/tmap/routes"
-    else:  # 도보
-        url = "https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json"
-
     headers = {
         "appKey": tmap_api_key,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
     }
 
-    # 공통 payload
-    payload = {
-        "startX": str(start_x),
-        "startY": str(start_y),
-        "endX": str(end_x),
-        "endY": str(end_y),
-        "reqCoordType": "WGS84GEO",
-        "resCoordType": "WGS84GEO",
-    }
-
-    # 보행자 옵션 추가 → startName, endName 반드시 추가
-    if route_type == "도보":
-        payload["startName"] = "출발지"
-        payload["endName"] = "도착지"
-
-    # 자동차 옵션 추가
     if route_type == "자동차":
-        payload["searchOption"] = "0"
-
-    # API 호출
-    response = requests.post(url, headers=headers, json=payload).json()
-
-    features = response.get("features", [])
-
-    # 요약 정보 추출
-    if features:
-        properties = features[0].get("properties", {})
-        summary = {
-            "totalDistance": properties.get("totalDistance", 0),  # meter
-            "totalTime": properties.get("totalTime", 0),          # second
-            "totalFare": properties.get("totalFare", 0),          # 원
-            "taxiFare": properties.get("taxiFare", 0)             # 원
+        url = "https://apis.openapi.sk.com/tmap/routes"
+        payload = {
+            "startX": str(start_x),
+            "startY": str(start_y),
+            "endX": str(end_x),
+            "endY": str(end_y),
+            "reqCoordType": "WGS84GEO",
+            "resCoordType": "WGS84GEO",
+            "searchOption": "0"
         }
-    else:
+        response = requests.post(url, headers=headers, json=payload).json()
+        features = response.get("features", [])
+        summary = {}
+        if features:
+            prop = features[0].get("properties", {})
+            summary = {
+                "totalDistance": prop.get("totalDistance", 0),
+                "totalTime": prop.get("totalTime", 0),
+                "totalFare": prop.get("totalFare", 0),
+                "taxiFare": prop.get("taxiFare", 0)
+            }
+        else:
+            summary = None
+
+    elif route_type == "도보":
+        url = "https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json"
+        payload = {
+            "startX": str(start_x),
+            "startY": str(start_y),
+            "endX": str(end_x),
+            "endY": str(end_y),
+            "reqCoordType": "WGS84GEO",
+            "resCoordType": "WGS84GEO",
+            "startName": "출발지",
+            "endName": "도착지"
+        }
+        response = requests.post(url, headers=headers, json=payload).json()
+        features = response.get("features", [])
+        summary = {}
+        if features:
+            prop = features[0].get("properties", {})
+            summary = {
+                "totalDistance": prop.get("totalDistance", 0),
+                "totalTime": prop.get("totalTime", 0),
+                "totalFare": prop.get("totalFare", 0),
+                "taxiFare": prop.get("taxiFare", 0)
+            }
+        else:
+            summary = None
+
+    else:  # 대중교통
+        url = "https://apis.openapi.sk.com/transit/routes"
+        payload = {
+            "startX": str(start_x),
+            "startY": str(start_y),
+            "endX": str(end_x),
+            "endY": str(end_y)
+        }
+        response = requests.post(url, headers=headers, json=payload).json()
+
+        # 대중교통 API 응답에서 경로와 요약 추출 (예시, 실제 응답구조 확인 필요)
+        routes = response.get("routes", [])
+        features = []
         summary = None
 
-    return features, summary
+        if routes:
+            # routes 안에 segments 또는 경로정보가 있을 수 있으므로 그중 하나를 사용
+            route = routes[0]  # 첫번째 경로 선택
 
+            # 예시: 경로의 전체 거리/시간 정보
+            totalDistance = route.get("totalDistance", 0)
+            totalTime = route.get("totalTime", 0)
+
+            summary = {
+                "totalDistance": totalDistance,
+                "totalTime": totalTime,
+                "totalFare": route.get("totalFare", "정보 없음"),
+            }
+
+            # 대중교통 경로 선 정보가 있으면 features로 변환 (아래는 임시 예시)
+            # 실제로는 segments 또는 geometry가 어떤 구조인지 확인 후 구현 필요
+            # 예를 들어 route 내 segments 배열 안에 각 구간의 경로 좌표가 있을 수 있음
+            if "segments" in route:
+                for segment in route["segments"]:
+                    # segment의 geometry 좌표 리스트가 있다고 가정
+                    if "geometry" in segment:
+                        geom = segment["geometry"]
+                        features.append({
+                            "geometry": geom
+                        })
+        else:
+            st.warning("대중교통 경로를 찾을 수 없습니다.")
+
+    return features, summary
 # Streamlit UI 구성
 st.title("🚗 경로 검색 웹앱 (카카오맵 + TMAP API)")
 
@@ -94,7 +147,7 @@ st.title("🚗 경로 검색 웹앱 (카카오맵 + TMAP API)")
 st.header("🗺️ 경로 설정")
 start_address = st.text_input("출발지 입력", "서울역")
 end_address = st.text_input("도착지 입력", "강남역")
-route_type = st.selectbox("경로 유형 선택", ["도보", "자동차"])  # 대중교통 삭제
+route_type = st.selectbox("경로 유형 선택", ["도보", "자동차","대중교통"])  # 대중교통 삭제
 
 # 경로 검색 버튼
 if st.button("경로 검색"):
