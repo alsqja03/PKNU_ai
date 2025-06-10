@@ -104,38 +104,9 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
             "endX": str(end_x),
             "endY": str(end_y)
         }
-        response = requests.post(url, headers=headers, json=payload).json()
-
-        # 대중교통 API 응답에서 경로와 요약 추출 (예시, 실제 응답구조 확인 필요)
-        routes = response.get("routes", [])
-        features = []
-        summary = None
-
-        if routes:
-            # routes 안에 segments 또는 경로정보가 있을 수 있으므로 그중 하나를 사용
-            route = routes[0]  # 첫번째 경로 선택
-
-            # 예시: 경로의 전체 거리/시간 정보
-            totalDistance = route.get("totalDistance", 0)
-            totalTime = route.get("totalTime", 0)
-
-            summary = {
-                "totalDistance": totalDistance,
-                "totalTime": totalTime,
-                "totalFare": route.get("totalFare", "정보 없음"),
-            }
-
-            # 대중교통 경로 선 정보가 있으면 features로 변환 (아래는 임시 예시)
-            # 실제로는 segments 또는 geometry가 어떤 구조인지 확인 후 구현 필요
-            # 예를 들어 route 내 segments 배열 안에 각 구간의 경로 좌표가 있을 수 있음
-            if "segments" in route:
-                for segment in route["segments"]:
-                    # segment의 geometry 좌표 리스트가 있다고 가정
-                    if "geometry" in segment:
-                        geom = segment["geometry"]
-                        features.append({
-                            "geometry": geom
-                        })
+        response = requests.post(url, headers=headers, json=payload)
+        data = response.json()
+        st.write(data)  # 여기서 응답 확인
         else:
             st.warning("대중교통 경로를 찾을 수 없습니다.")
 
