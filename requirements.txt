@@ -6,3 +6,4 @@ numpy
 pdfplumber
 duckduckgo_search
 pytesseract
+requests
