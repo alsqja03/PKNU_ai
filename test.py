@@ -37,13 +37,63 @@ def address_to_coord(address, kakao_api_key):
 
 # TMAP 경로 요청 함수 + 요약 정보 반환
 def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
+    features = []
+    summary = None
+
     headers = {
         "appKey": tmap_api_key,
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
 
-    if route_type == "대중교통":
+    if route_type == "자동차":
+        url = "https://apis.openapi.sk.com/tmap/routes"
+        payload = {
+            "startX": str(start_x),
+            "startY": str(start_y),
+            "endX": str(end_x),
+            "endY": str(end_y),
+            "reqCoordType": "WGS84GEO",
+            "resCoordType": "WGS84GEO",
+            "searchOption": "0"
+        }
+        response = requests.post(url, headers=headers, json=payload)
+        data = response.json()
+        features = data.get("features", [])
+        if features:
+            properties = features[0].get("properties", {})
+            summary = {
+                "totalDistance": properties.get("totalDistance", 0),
+                "totalTime": properties.get("totalTime", 0),
+                "totalFare": properties.get("totalFare", 0),
+                "taxiFare": properties.get("taxiFare", 0)
+            }
+
+    elif route_type == "도보":
+        url = "https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json"
+        payload = {
+            "startX": str(start_x),
+            "startY": str(start_y),
+            "endX": str(end_x),
+            "endY": str(end_y),
+            "reqCoordType": "WGS84GEO",
+            "resCoordType": "WGS84GEO",
+            "startName": "출발지",
+            "endName": "도착지"
+        }
+        response = requests.post(url, headers=headers, json=payload)
+        data = response.json()
+        features = data.get("features", [])
+        if features:
+            properties = features[0].get("properties", {})
+            summary = {
+                "totalDistance": properties.get("totalDistance", 0),
+                "totalTime": properties.get("totalTime", 0),
+                "totalFare": 0,
+                "taxiFare": 0
+            }
+
+    else:  # 대중교통
         url = "https://apis.openapi.sk.com/transit/routes"
         payload = {
             "startX": str(start_x),
@@ -52,35 +102,35 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
             "endY": str(end_y)
         }
         response = requests.post(url, headers=headers, json=payload)
-        if response.status_code != 200:
-            st.error(f"대중교통 API 요청 실패: 상태 코드 {response.status_code}")
-            st.write(response.text)
-            return [], None
-
         data = response.json()
+        st.write("대중교통 API 응답 예시:", data)  # 응답 데이터 확인용
+
         routes = data.get("routes", [])
-        if not routes:
+        if routes:
+            route = routes[0]
+            totalDistance = route.get("totalDistance", 0)
+            totalTime = route.get("totalTime", 0)
+            totalFare = route.get("totalFare", "정보 없음")
+
+            summary = {
+                "totalDistance": totalDistance,
+                "totalTime": totalTime,
+                "totalFare": totalFare
+            }
+
+            # segments 내 geometry 좌표들을 features로 변환
+            features = []
+            segments = route.get("segments", [])
+            for segment in segments:
+                geom = segment.get("geometry")
+                if geom:
+                    features.append({
+                        "geometry": geom
+                    })
+        else:
             st.warning("대중교통 경로를 찾을 수 없습니다.")
-            return [], None
 
-        route = routes[0]
-        summary = {
-            "totalDistance": route.get("totalDistance", 0),
-            "totalTime": route.get("totalTime", 0),
-            "totalFare": route.get("totalFare", "정보 없음")
-        }
-
-        features = []
-        for segment in route.get("segments", []):
-            geometry = segment.get("geometry")
-            if geometry:
-                features.append({"geometry": geometry})
-
-        return features, summary
-
-    # 도보, 자동차 처리 코드 (생략)
-    return [], None
-
+    return features, summary
 
 
 # Streamlit UI 구성
