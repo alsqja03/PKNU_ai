@@ -9,31 +9,49 @@ KAKAO_JS_API_KEY = "16dad1fa420e90b7d6cfef4f8e5ec429"
 def get_coordinates(address):
     url = "https://dapi.kakao.com/v2/local/search/address.json"
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
-    params = {"query": address}
+    params = {"query": address.strip()}
 
+    # 요청 보내기
     response = requests.get(url, headers=headers, params=params)
+
+    # 디버깅 정보 출력
+    st.write(f"📍 검색 주소: {address}")
+    st.write(f"🔗 요청 URL: {response.url}")
+    st.write(f"✅ 응답 상태 코드: {response.status_code}")
+
+    try:
+        response_json = response.json()
+        st.json(response_json)  # 응답 JSON 출력
+    except Exception as e:
+        st.error(f"응답 JSON 파싱 오류: {e}")
+        return None, None
+
+    # 좌표 추출
     if response.status_code == 200:
-        documents = response.json().get("documents")
+        documents = response_json.get("documents")
         if documents:
             x = documents[0]["x"]
             y = documents[0]["y"]
             return float(x), float(y)
+
     return None, None
 
 # Streamlit UI
-st.title("카카오 지도 길찾기 데모")
+st.title("🗺️ 카카오 지도 길찾기 데모")
 
 start_address = st.text_input("출발지 입력", "서울역")
 end_address = st.text_input("도착지 입력", "강남역")
 
 if st.button("길찾기 검색"):
+    st.info("좌표 검색 중... 🚀")
+
     start_x, start_y = get_coordinates(start_address)
     end_x, end_y = get_coordinates(end_address)
 
     if None in (start_x, start_y, end_x, end_y):
-        st.error("주소를 찾을 수 없습니다. 다시 입력해주세요.")
+        st.error("❌ 주소를 찾을 수 없습니다. 다시 입력해주세요.")
     else:
-        st.success("주소 검색 성공! 지도를 표시합니다.")
+        st.success("✅ 주소 검색 성공! 지도를 표시합니다.")
 
         # 카카오 지도 HTML 삽입
         map_html = f"""
