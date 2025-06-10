@@ -36,15 +36,17 @@ def address_to_coord(address, kakao_api_key):
 
 # TMAP 경로 요청 함수 + 요약 정보 반환
 def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
-    url = "https://apis.openapi.sk.com/tmap/routes/pedestrian"  # 기본 도보
     if route_type == "자동차":
         url = "https://apis.openapi.sk.com/tmap/routes"
+    else:  # 도보
+        url = "https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json"
 
     headers = {
         "appKey": tmap_api_key,
         "Content-Type": "application/json"
     }
 
+    # 공통 payload
     payload = {
         "startX": str(start_x),
         "startY": str(start_y),
@@ -54,12 +56,18 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
         "resCoordType": "WGS84GEO",
     }
 
-    if route_type == "자동차":
-        payload.update({
-            "searchOption": "0"
-        })
+    # 보행자 옵션 추가 → startName, endName 반드시 추가
+    if route_type == "도보":
+        payload["startName"] = "출발지"
+        payload["endName"] = "도착지"
 
+    # 자동차 옵션 추가
+    if route_type == "자동차":
+        payload["searchOption"] = "0"
+
+    # API 호출
     response = requests.post(url, headers=headers, json=payload).json()
+
     features = response.get("features", [])
 
     # 요약 정보 추출
@@ -75,6 +83,7 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
         summary = None
 
     return features, summary
+
 
 # Streamlit UI 구성
 st.title("🚗 경로 검색 웹앱 (카카오맵 + TMAP API)")
