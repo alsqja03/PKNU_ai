@@ -96,7 +96,7 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
         else:
             summary = None
 
-    elif route_type == "대중교통통":
+    elif route_type == "대중교통":
         url = "https://apis.openapi.sk.com/transit/routes"
         payload = {
             "startX": str(start_x),
