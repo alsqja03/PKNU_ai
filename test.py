@@ -96,7 +96,7 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
         else:
             summary = None
 
-    else:  # 대중교통
+    elif route_type == "대중교통통":
         url = "https://apis.openapi.sk.com/transit/routes"
         payload = {
             "startX": str(start_x),
@@ -147,7 +147,7 @@ st.title("🚗 경로 검색 웹앱 (카카오맵 + TMAP API)")
 st.header("🗺️ 경로 설정")
 start_address = st.text_input("출발지 입력", "서울역")
 end_address = st.text_input("도착지 입력", "강남역")
-route_type = st.selectbox("경로 유형 선택", ["도보", "자동차","대중교통"])  # 대중교통 삭제
+route_type = st.selectbox("경로 유형 선택", ["도보", "자동차", "대중교통"])  # 대중교통 삭제
 
 # 경로 검색 버튼
 if st.button("경로 검색"):
