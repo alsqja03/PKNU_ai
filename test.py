@@ -46,7 +46,8 @@ if st.button("길찾기 링크 생성"):
             st.error("주소를 찾을 수 없습니다. 다시 입력해주세요.")
         else:
             kakao_map_url = (
-                f"https://map.kakao.com/link/to/{end_addr},{end_y},{end_x}"
-                f"?from={start_addr},{start_y},{start_x}"
-            )
+    f"https://map.kakao.com/?fromCoord={start_x},{start_y}"
+    f"&toCoord={end_x},{end_y}"
+    f"&from={start_addr}&to={end_addr}"
+)
             st.markdown(f"[카카오 지도 길찾기 바로가기]({kakao_map_url})", unsafe_allow_html=True)
