@@ -1,3 +1,15 @@
+import streamlit as st
+import requests
+import folium
+from streamlit_folium import st_folium
+
+# ✅ API 키를 여기에 직접 작성
+kakao_api_key = "12ef3a654aaaed8710e1f5a04454d0a2"
+tmap_api_key = "MSQEscmmjL6QqEvry9SJ47eodN5WnKD6R9kv5ie4"
+
+# 주소 또는 키워드 → 좌표 변환 함수
+def address_to_coord(address, kakao_api_key):
+    url_address = "https://dapi.kakao.com/v2/local/search/address.json"
     headers = {"Authorization": f"KakaoAK {kakao_api_key}"}
     params = {"query": address}
 
