@@ -2,9 +2,9 @@ import streamlit as st
 import requests
 
 # 카카오 REST API 키
-KAKAO_REST_API_KEY = "여기에_본인_KAKAO_REST_API_KEY_입력"
+KAKAO_REST_API_KEY = "	12ef3a654aaaed8710e1f5a04454d0a2"
 # 카카오 JavaScript API 키
-KAKAO_JS_API_KEY = "여기에_본인_KAKAO_JAVASCRIPT_API_KEY_입력"
+KAKAO_JS_API_KEY = "16dad1fa420e90b7d6cfef4f8e5ec429"
 
 def get_coordinates(address):
     url = "https://dapi.kakao.com/v2/local/search/address.json"
