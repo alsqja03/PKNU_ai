@@ -7,3 +7,4 @@ pdfplumber
 duckduckgo_search
 pytesseract
 requests
+googlemaps
