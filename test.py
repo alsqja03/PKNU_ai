@@ -1,26 +1,28 @@
 import streamlit as st
 import requests
 
-# Streamlit 앱 제목
-st.title("🗺️ 카카오 지도 길찾기 데모")
+# 상태 저장용 변수
+if "current_rest_api_key" not in st.session_state:
+    st.session_state.current_rest_api_key = ""
+if "current_js_api_key" not in st.session_state:
+    st.session_state.current_js_api_key = ""
 
-# --- 사용자에게 API 키 입력 받기 ---
-with st.expander("🔑 API 키 설정", expanded=True):
-    KAKAO_REST_API_KEY = st.text_input("카카오 REST API 키 (KakaoAK)", type="password")
-    KAKAO_JS_API_KEY = st.text_input("카카오 JavaScript API 키", type="password")
+# 사용자에게 API 키 입력 받기
+with st.expander("🔑 카카오 API 키 입력", expanded=True):
+    st.session_state.current_rest_api_key = st.text_input(
+        "Kakao REST API Key", st.session_state.current_rest_api_key
+    )
+    st.session_state.current_js_api_key = st.text_input(
+        "Kakao JavaScript API Key", st.session_state.current_js_api_key
+    )
 
-# API 키를 세션에 저장 (처음 입력한 경우만)
-if "rest_api_key" not in st.session_state and KAKAO_REST_API_KEY:
-    st.session_state.rest_api_key = KAKAO_REST_API_KEY
-if "js_api_key" not in st.session_state and KAKAO_JS_API_KEY:
-    st.session_state.js_api_key = KAKAO_JS_API_KEY
+# 현재 API 키 가져오기
+current_rest_api_key = st.session_state.current_rest_api_key
+current_js_api_key = st.session_state.current_js_api_key
 
-# 현재 사용할 API 키 확인
-current_rest_api_key = st.session_state.get("rest_api_key", "")
-current_js_api_key = st.session_state.get("js_api_key", "")
-
+# 좌표 가져오는 함수 (주소 → 키워드 fallback)
 def get_coordinates(address):
-    # 1️⃣ 먼저 address.json 호출
+    # 1️⃣ 주소 검색 시도
     url_address = "https://dapi.kakao.com/v2/local/search/address.json"
     headers = {"Authorization": f"KakaoAK {current_rest_api_key}"}
     params = {"query": address.strip()}
@@ -46,7 +48,7 @@ def get_coordinates(address):
             st.info("✅ 주소 검색 성공")
             return float(x), float(y)
 
-    # 2️⃣ 주소 결과 없으면 → keyword.json 호출
+    # 2️⃣ 키워드 검색 fallback 시도
     st.warning("⚠️ 주소 검색 결과 없음 → 키워드 검색 시도")
 
     url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
@@ -73,21 +75,20 @@ def get_coordinates(address):
             st.info("✅ 키워드 검색 성공")
             return float(x), float(y)
 
-    # 3️⃣ 둘 다 실패
+    # 둘 다 실패
     return None, None
 
-# --- UI 입력 ---
+# Streamlit UI
+st.title("🗺️ 카카오 지도 길찾기 데모 (주소 + 키워드 자동 fallback)")
+
 start_address = st.text_input("출발지 입력", "서울역")
 end_address = st.text_input("도착지 입력", "강남역")
 
-# --- 길찾기 버튼 ---
 if st.button("길찾기 검색"):
-    # API 키 입력 여부 확인
+    # API 키 입력 체크
     if not current_rest_api_key or not current_js_api_key:
-        st.error("❌ 먼저 API 키를 입력하세요.")
+        st.error("❌ API 키를 입력하세요.")
     else:
-        st.info("좌표 검색 중... 🚀")
-
         start_x, start_y = get_coordinates(start_address)
         end_x, end_y = get_coordinates(end_address)
 
@@ -96,53 +97,55 @@ if st.button("길찾기 검색"):
         else:
             st.success("✅ 주소 검색 성공! 지도를 표시합니다.")
 
-            # 카카오 지도 HTML 삽입
+            # Kakao 지도 HTML
             map_html = f"""
             <div id="map" style="width:100%;height:500px;"></div>
-            <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey={current_js_api_key}&libraries=services"></script>
+            <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={current_js_api_key}&autoload=false&libraries=services"></script>
             <script>
-                var mapContainer = document.getElementById('map');
-                var mapOption = {{
-                    center: new kakao.maps.LatLng({start_y}, {start_x}),
-                    level: 5
-                }};
-                var map = new kakao.maps.Map(mapContainer, mapOption);
+                kakao.maps.load(function() {{
+                    var mapContainer = document.getElementById('map');
+                    var mapOption = {{
+                        center: new kakao.maps.LatLng({start_y}, {start_x}),
+                        level: 5
+                    }};
+                    var map = new kakao.maps.Map(mapContainer, mapOption);
 
-                // 출발지 마커
-                var startMarker = new kakao.maps.Marker({{
-                    position: new kakao.maps.LatLng({start_y}, {start_x}),
-                    map: map,
-                    title: '출발지'
+                    // 출발지 마커
+                    var startMarker = new kakao.maps.Marker({{
+                        position: new kakao.maps.LatLng({start_y}, {start_x}),
+                        map: map,
+                        title: '출발지'
+                    }});
+
+                    // 도착지 마커
+                    var endMarker = new kakao.maps.Marker({{
+                        position: new kakao.maps.LatLng({end_y}, {end_x}),
+                        map: map,
+                        title: '도착지'
+                    }});
+
+                    // 선 그리기
+                    var linePath = [
+                        new kakao.maps.LatLng({start_y}, {start_x}),
+                        new kakao.maps.LatLng({end_y}, {end_x})
+                    ];
+
+                    var polyline = new kakao.maps.Polyline({{
+                        path: linePath,
+                        strokeWeight: 5,
+                        strokeColor: '#FF0000',
+                        strokeOpacity: 0.7,
+                        strokeStyle: 'solid'
+                    }});
+
+                    polyline.setMap(map);
+
+                    // 지도 영역 재설정 (출발지와 도착지를 모두 포함하도록)
+                    var bounds = new kakao.maps.LatLngBounds();
+                    bounds.extend(new kakao.maps.LatLng({start_y}, {start_x}));
+                    bounds.extend(new kakao.maps.LatLng({end_y}, {end_x}));
+                    map.setBounds(bounds);
                 }});
-
-                // 도착지 마커
-                var endMarker = new kakao.maps.Marker({{
-                    position: new kakao.maps.LatLng({end_y}, {end_x}),
-                    map: map,
-                    title: '도착지'
-                }});
-
-                // 선 그리기
-                var linePath = [
-                    new kakao.maps.LatLng({start_y}, {start_x}),
-                    new kakao.maps.LatLng({end_y}, {end_x})
-                ];
-
-                var polyline = new kakao.maps.Polyline({{
-                    path: linePath,
-                    strokeWeight: 5,
-                    strokeColor: '#FF0000',
-                    strokeOpacity: 0.7,
-                    strokeStyle: 'solid'
-                }});
-
-                polyline.setMap(map);
-
-                // 지도 영역 재설정 (출발지와 도착지를 모두 포함하도록)
-                var bounds = new kakao.maps.LatLngBounds();
-                bounds.extend(new kakao.maps.LatLng({start_y}, {start_x}));
-                bounds.extend(new kakao.maps.LatLng({end_y}, {end_x}));
-                map.setBounds(bounds);
             </script>
             """
 
