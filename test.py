@@ -80,7 +80,7 @@ if st.button("길찾기 검색"):
 
             # 쿼리 스트링으로 좌표 넘기기 (선택사항)
             iframe_url = (
-                f"https://maphtml.streamlit.app"
+                f"http://pknumap.kro.kr"
                 f"?start_x={start_x}&start_y={start_y}&end_x={end_x}&end_y={end_y}"
             )
             st.components.v1.iframe(iframe_url, height=600)
