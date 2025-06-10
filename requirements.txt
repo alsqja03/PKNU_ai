@@ -9,3 +9,4 @@ pytesseract
 requests
 googlemaps
 folium
+streamlit_folium
