@@ -7,7 +7,6 @@ from streamlit_folium import st_folium
 kakao_api_key = "c01caa2d92080c9d7a47b122970248a7"
 tmap_api_key = "MSQEscmmjL6QqEvry9SJ47eodN5WnKD6R9kv5ie4"
 
-print(kako_api_key, tmap_api_key)
 # 주소 또는 키워드 → 좌표 변환 함수
 def address_to_coord(address, kakao_api_key):
     # 1️⃣ 주소 검색 시도
