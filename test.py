@@ -90,7 +90,7 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
     return features, summary
 
 # Streamlit UI 구성
-st.title("🚗 경로 검색 웹앱 (카카오맵 + TMAP API)")
+st.title("🚗 여행지 경로 검색")
 
 # 출발지/도착지 입력
 st.header("🗺️ 경로 설정")
