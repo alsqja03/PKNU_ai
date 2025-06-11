@@ -10,17 +10,21 @@ tmap_api_key = "MSQEscmmjL6QqEvry9SJ47eodN5WnKD6R9kv5ie4"
 # 주소 또는 키워드 → 좌표 변환 함수
 def address_to_coord(address, kakao_api_key):
     headers = {"Authorization": f"KakaoAK {kakao_api_key}"}
+    url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
+    params = {"query": address}
 
-    # 1️⃣ 주소 검색
-    url_address = "https://dapi.kakao.com/v2/local/search/address.json"
-    response = requests.get(url_address, headers=headers, params={"query": address}).json()
+    response = requests.get(url_keyword, headers=headers, params=params).json()
     documents = response.get("documents", [])
 
     if documents:
         x = float(documents[0]["x"])
         y = float(documents[0]["y"])
+        st.info(f"📍 키워드 검색 결과: {documents[0]['place_name']}")
         return x, y
 
+    st.error(f"❌ '{address}'에 대한 장소를 찾을 수 없습니다.")
+    return None, None
+    
     # 2️⃣ 키워드 검색 (범용 검색)
     url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
     response_keyword = requests.get(url_keyword, headers=headers, params={"query": address}).json()
