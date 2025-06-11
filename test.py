@@ -92,44 +92,6 @@ def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
                 "totalFare": 0,
                 "taxiFare": 0
             }
-
-    else:  # 대중교통
-        url = "https://apis.openapi.sk.com/transit/routes"
-        payload = {
-            "startX": str(start_x),
-            "startY": str(start_y),
-            "endX": str(end_x),
-            "endY": str(end_y)
-        }
-        response = requests.post(url, headers=headers, json=payload)
-        data = response.json()
-        st.write("대중교통 API 응답 예시:", data)  # 응답 데이터 확인용
-
-        routes = data.get("routes", [])
-        if routes:
-            route = routes[0]
-            totalDistance = route.get("totalDistance", 0)
-            totalTime = route.get("totalTime", 0)
-            totalFare = route.get("totalFare", "정보 없음")
-
-            summary = {
-                "totalDistance": totalDistance,
-                "totalTime": totalTime,
-                "totalFare": totalFare
-            }
-
-            # segments 내 geometry 좌표들을 features로 변환
-            features = []
-            segments = route.get("segments", [])
-            for segment in segments:
-                geom = segment.get("geometry")
-                if geom:
-                    features.append({
-                        "geometry": geom
-                    })
-        else:
-            st.warning("대중교통 경로를 찾을 수 없습니다.")
-
     return features, summary
 
 
@@ -139,7 +101,7 @@ st.title("🚗 경로 검색 웹앱 (카카오맵 + TMAP API)")
 st.header("🗺️ 경로 설정")
 start_address = st.text_input("출발지 입력", "서울역")
 end_address = st.text_input("도착지 입력", "강남역")
-route_type = st.selectbox("경로 유형 선택", ["도보", "자동차", "대중교통"])
+route_type = st.selectbox("경로 유형 선택", ["도보", "자동차"])
 
 if st.button("경로 검색"):
     start_x, start_y = address_to_coord(start_address, kakao_api_key)
