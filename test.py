@@ -10,28 +10,19 @@ tmap_api_key = st.text_input("Tmap API 키 입력", type="password")
 # 주소 또는 키워드 → 좌표 변환 함수
 def address_to_coord(address, kakao_api_key):
     headers = {"Authorization": f"KakaoAK {kakao_api_key}"}
+    url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
+    params = {"query": address}
 
-    # 1️⃣ 주소 검색 시도
-    url_address = "https://dapi.kakao.com/v2/local/search/address.json"
-    response = requests.get(url_address, headers=headers, params={"query": address}).json()
+    response = requests.get(url_keyword, headers=headers, params=params).json()
     documents = response.get("documents", [])
 
     if documents:
         x = float(documents[0]["x"])
         y = float(documents[0]["y"])
+        st.info(f"📍 키워드 검색 결과: {documents[0]['place_name']}")
         return x, y
 
-    # 2️⃣ 키워드 검색 fallback
-    url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
-    response_keyword = requests.get(url_keyword, headers=headers, params={"query": address}).json()
-    documents_keyword = response_keyword.get("documents", [])
-
-    if documents_keyword:
-        place = documents_keyword[0]
-        st.info(f"⚠️ 주소 인식 실패 → 키워드 검색 사용: {place['place_name']}")
-        return float(place["x"]), float(place["y"])
-
-    st.error(f"❌ '{address}'에 대한 검색 결과가 없습니다.")
+    st.error(f"❌ '{address}'에 대한 장소를 찾을 수 없습니다.")
     return None, None
 
 # TMAP 경로 요청 함수
