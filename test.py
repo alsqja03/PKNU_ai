@@ -4,7 +4,7 @@ import folium
 from streamlit_folium import st_folium
 
 # ✅ API 키를 여기에 직접 작성
-kakao_api_key = "12ef3a654aaaed8710e1f5a04454d0a2"
+kakao_api_key = "c01caa2d92080c9d7a47b122970248a7"
 tmap_api_key = "MSQEscmmjL6QqEvry9SJ47eodN5WnKD6R9kv5ie4"
 
 
