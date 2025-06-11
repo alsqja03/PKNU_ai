@@ -16,6 +16,8 @@ def address_to_coord(address, kakao_api_key):
     params = {"query": address}
 
     response = requests.get(url_address, headers=headers, params=params).json()
+    print("주소 검색 결과:", response)
+    print("키워드 검색 결과:", response_keyword)
     documents = response.get("documents", [])
 
     if documents:
