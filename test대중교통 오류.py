@@ -9,24 +9,30 @@ tmap_api_key = "MSQEscmmjL6QqEvry9SJ47eodN5WnKD6R9kv5ie4"
 
 # 주소 또는 키워드 → 좌표 변환 함수
 def address_to_coord(address, kakao_api_key):
-    url_address = "https://dapi.kakao.com/v2/local/search/address.json"
     headers = {"Authorization": f"KakaoAK {kakao_api_key}"}
-    params = {"query": address}
-    response = requests.get(url_address, headers=headers, params=params).json()
+
+    # 1️⃣ 주소 검색
+    url_address = "https://dapi.kakao.com/v2/local/search/address.json"
+    response = requests.get(url_address, headers=headers, params={"query": address}).json()
     documents = response.get("documents", [])
+
     if documents:
         x = float(documents[0]["x"])
         y = float(documents[0]["y"])
         return x, y
-    # 키워드 검색 fallback
+
+    # 2️⃣ 키워드 검색 (범용 검색)
     url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
-    response_keyword = requests.get(url_keyword, headers=headers, params=params).json()
-    documents_keyword = response_keyword.get("documents", [])
-    if documents_keyword:
-        x = float(documents_keyword[0]["x"])
-        y = float(documents_keyword[0]["y"])
-        st.info(f"⚠️ 주소 검색 실패 → 키워드 검색 결과 사용: {documents_keyword[0]['place_name']}")
+    response_keyword = requests.get(url_keyword, headers=headers, params={"query": address}).json()
+    keyword_docs = response_keyword.get("documents", [])
+
+    if keyword_docs:
+        x = float(keyword_docs[0]["x"])
+        y = float(keyword_docs[0]["y"])
+        st.info(f"⚠️ 주소 검색 실패 → 키워드 검색 결과 사용: {keyword_docs[0]['place_name']}")
         return x, y
+
+    # 3️⃣ 실패
     return None, None
 
 # TMAP 경로 요청 함수 + 요약 정보 반환
