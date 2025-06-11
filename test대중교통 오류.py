@@ -24,20 +24,6 @@ def address_to_coord(address, kakao_api_key):
 
     st.error(f"❌ '{address}'에 대한 장소를 찾을 수 없습니다.")
     return None, None
-    
-    # 2️⃣ 키워드 검색 (범용 검색)
-    url_keyword = "https://dapi.kakao.com/v2/local/search/keyword.json"
-    response_keyword = requests.get(url_keyword, headers=headers, params={"query": address}).json()
-    keyword_docs = response_keyword.get("documents", [])
-
-    if keyword_docs:
-        x = float(keyword_docs[0]["x"])
-        y = float(keyword_docs[0]["y"])
-        st.info(f"⚠️ 주소 검색 실패 → 키워드 검색 결과 사용: {keyword_docs[0]['place_name']}")
-        return x, y
-
-    # 3️⃣ 실패
-    return None, None
 
 # TMAP 경로 요청 함수 + 요약 정보 반환
 def get_tmap_route(start_x, start_y, end_x, end_y, route_type, tmap_api_key):
